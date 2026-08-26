@@ -1,89 +1,42 @@
-\chapter{Introduction and Scope}\label{chap:intro}
+\chapter{Project Overview}\label{chap:intro}
 
-For the final week of the Ejada Cloud Build Track internship, teams were asked to take an
-application running on a native OCI Compute instance, modernize it into a microservice
-architecture, and migrate it to Oracle Kubernetes Engine (OKE) using the OCI, Terraform,
-Docker, and Kubernetes skills built up over the preceding weeks. Group A chose an
-e-commerce application for this build. This documentation covers our combined
-deliverable: the assessment phase that turned the application's description into a set
-of microservice boundaries, and the architecture and Terraform/Kubernetes mechanics used
-to implement, deploy, and continuously update them on OKE.
+An e-commerce application, split into five independently deployable Git repositories
+(four backend services plus a Next.js frontend) and deployed to Oracle Kubernetes
+Engine (OKE) with a Terraform-provisioned cluster and a Helm/ArgoCD GitOps pipeline.
+Built by Group A for the final week of the Ejada Cloud Build Track internship.
 
-\section{Background and Motivation}\label{sec:background-motivation}
-Splitting a monolithic-style application into independently deployable microservices is
-a defense-in-depth and scaling strategy at the application layer, in the same way
-splitting a network into public and private tiers is a defense-in-depth strategy at the
-infrastructure layer. Each service can be built, scaled, and deployed on its own
-schedule, and a bug or overload in one domain does not directly take down another. The
-assignment asked us to go beyond a single-service lab exercise: the resulting
-architecture had to be reusable across the team, automatically built and deployed
-through CI/CD, and hosted on infrastructure that already followed the network patterns
-established in earlier weeks of the program.
+\section{Objectives and Scope}\label{sec:core-question}
+The build had two objectives: split the application into microservice boundaries
+based on data ownership, each with its own repository and container image; and
+automate the path from a code push to a running pod.
 
-\section{Objective}\label{sec:core-question}
-The primary question this documentation answers is: \emph{what microservice boundaries
-did we choose for this application, and how are they actually built, containerized, and
-deployed to OKE end to end?} Two secondary questions follow from it:
+\textbf{In scope:} one OCI region (\texttt{me-jeddah-1}), one compartment
+(\texttt{shared-group-a-cmp}), one OKE cluster and namespace
+(\texttt{ecommerce-ns}), the five application repositories above, and the
+\texttt{Terraform-code} repository holding the infrastructure, Kubernetes manifests,
+and Helm chart.
 
-\begin{itemize}[leftmargin=1.4em]
-  \item how the assessment phase's data-ownership analysis translated into the final set
-        of services and repositories; and
-  \item how the Terraform network module and the Kubernetes/Helm/ArgoCD deployment
-        pipeline fit together into one automated path from a code push to a running pod.
-\end{itemize}
+\textbf{Out of scope:} automated testing, multi-region or multi-availability-domain
+high availability, and a production security review. Three customer-facing
+storefront pages remain incomplete (see Section~\ref{sec:frontend-completeness}),
+and a few areas of the implementation differ from the original design draft,
+summarised in Section~\ref{sec:draft-vs-implementation}.
 
-\section{Scope and Boundaries}\label{sec:scope-boundaries}
-This build targets a single OCI region, \texttt{me-jeddah-1}, and a single shared
-compartment, \texttt{shared-group-a-cmp}, hosting one OKE cluster and one Kubernetes
-namespace, \texttt{ecommerce-ns}. The application is split into five Git repositories
-under the \texttt{Ejada-A} GitHub organization: four backend services
-(\texttt{auth-service}, \texttt{products-service}, \texttt{orders-service},
-\texttt{payments-service}) and one Next.js frontend (\texttt{ecomm-ui}), alongside a
-separate \texttt{Terraform-code} repository holding the infrastructure, Kubernetes
-manifests, and Helm chart. This documentation does not cover multi-region or
-multi-availability-domain high availability, load testing under real traffic, or a
-production compliance review; the compute sizing and per-service database engine were
-also left as open implementation decisions during the assessment phase, which we
-address explicitly in Chapter~\ref{chap:concl}.
-
-\section{Key Stakeholders}\label{sec:key-stakeholders}
+\section{Project Ownership}\label{sec:key-stakeholders}
 \begin{table}[H]
 \centering
-\caption{Stakeholders in the Group A final project and this documentation.}
+\caption{Project ownership and audience.}
 \label{tab:stakeholder-map}
 \small
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X
-                >{\raggedright\arraybackslash}X
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.6cm}
                 >{\raggedright\arraybackslash}X}
 \toprule
-\textbf{Stakeholder} & \textbf{Interest or Role} & \textbf{Relevance} \\
+\textbf{Owner} & \textbf{Area} \\
 \midrule
-Group A (build team) & Designs, implements, and maintains the four microservices, the frontend, and the Terraform/Helm/ArgoCD deployment pipeline & Collective author of the configuration and application code this documentation describes \\
-Ali Yousef & Group A member; compiled this documentation & Author of this write-up \\
-Ali Hamad & Group A member; credited as Helm chart maintainer and infrastructure/deployment lead in the repository & Primary author of the deployment runbook (\texttt{DEPLOYMENT.md}) referenced throughout \\
-Ejada Cloud Build Track & Reviews the assignment deliverable against the stated learning objectives & Target audience for this documentation \\
-Application end users & Interact with the storefront through the public load balancer & Affected by the correctness of the routing and service boundaries described in Chapter~\ref{chap:results} \\
-Future maintainers & Would extend this architecture, for example by finalizing the per-service database engine or compute sizing & Rely on the implementation approach in Chapter~\ref{chap:Methodology} to extend the configuration consistently \\
+Group A (build team) & All six repositories: four backend microservices, the frontend, and the Terraform/Helm/ArgoCD deployment pipeline \\
+Ali Yousef & Documentation coordination for this deliverable \\
+Ali Hamad & Helm chart maintainer; author of the deployment runbook (\texttt{DEPLOYMENT.md}) referenced throughout \\
+Ejada Cloud Build Track & Reviews this deliverable against the program's learning objectives \\
 \bottomrule
 \end{tabularx}
 \end{table}
-
-\section{Main Risks and Uncertainties}\label{sec:overview-risks}
-The assessment phase explicitly left two implementation details open rather than
-specifying them upfront: the OKE node pool's compute shape and OCPU/memory split, and
-the specific database engine used per service. Both were resolved with concrete
-defaults during the Terraform and Kubernetes build, which we document as implemented in
-Chapter~\ref{chap:results} and revisit as an open item in Chapter~\ref{chap:concl}.
-
-\section{How This Documentation Is Organized}\label{sec:report-structure}
-Chapter~\ref{chap:background} sets out the domain-ownership analysis behind the four
-microservice boundaries, the full OKE network design (subnets, gateways, route tables,
-and security rules), and the application-layer design decisions (scalability, routing,
-registry, and storage) from the assessment phase.
-Chapter~\ref{chap:Methodology} explains the Terraform and Kubernetes mechanics used to
-implement that architecture, including the CI/CD and GitOps pipeline that keeps the
-cluster in sync with each service's own repository. Chapter~\ref{chap:results} walks
-through the architecture as actually deployed: the network, the routing, the autoscaling
-configuration, and the deployment pipeline. Chapter~\ref{chap:concl} turns that into our
-conclusions, and Chapter~\ref{chap:todo} lists the concrete decisions we would still
-finalize. The appendix collects a glossary of terms and a command reference.

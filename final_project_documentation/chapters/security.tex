@@ -1,0 +1,130 @@
+\chapter{Security Considerations}\label{chap:security}
+
+This chapter covers network access, authentication and authorization, payment
+confirmation, secrets management, IAM, the data layer, and pod-level hardening as
+currently configured.
+
+\section{Network-Level Access}\label{sec:sec-network}
+Table~\ref{tab:security-network} summarises the network paths currently open to the
+cluster, based on \texttt{modules/network/locals.tf} and the boolean overrides in
+\texttt{main.tf} (Section~\ref{sec:domain-context}).
+
+\begin{table}[H]
+\centering
+\caption{Network access rules.}
+\label{tab:security-network}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm} X}
+\toprule
+\textbf{Path} & \textbf{Current rule} \\
+\midrule
+Kubernetes API endpoint & TCP 6443 open to \texttt{0.0.0.0/0}, not restricted to team IPs \\
+Load Balancer & TCP 80 and TCP 443 both open to \texttt{0.0.0.0/0} \\
+Worker node SSH & TCP 22 open to \texttt{0.0.0.0/0} (\texttt{enable\_worker\_ssh\_access = true} in \texttt{main.tf}) \\
+Worker node NodePort range & TCP 30000--32767 open to \texttt{0.0.0.0/0}, bypassing the Load Balancer (\texttt{enable\_nodeport\_public\_access = true}) \\
+Worker node general outbound & Unrestricted outbound TCP to \texttt{0.0.0.0/0} (\texttt{enable\_worker\_\allowbreak general\_\allowbreak outbound = true}) \\
+Pod outbound & TCP 443 to \texttt{0.0.0.0/0} (\texttt{enable\_pods\_outbound\_internet = true}) \\
+ArgoCD server UI & Exposed via a public NGINX ingress (\texttt{argocd/argocd-ingress.yaml}), HTTPS force-redirected \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The network module's optional access switches default to off; the root module
+enables all of them. Worker nodes and pods still reach OCI services (including
+OCIR image pulls) through the private Service Gateway rather than the NAT path,
+matching the route tables in Appendix~\ref{sec:appendix-network}.
+
+\section{Authentication and Authorization}\label{sec:sec-app-auth}
+\begin{warningbox}[Backend Authorization]
+The backend services (\texttt{auth-service}, \texttt{products-service},
+\texttt{orders-service}, \texttt{payments-service}) do not check a token, header, or
+role on any route. \texttt{products-service}'s \texttt{POST}, \texttt{PUT}, and
+\texttt{DELETE /products} routes -- and the \texttt{ecomm-ui} BFF routes and Server
+Actions that call them -- accept requests from any caller that can reach the
+service.
+\end{warningbox}
+
+The system implements two authentication paths:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Admin authentication.} \texttt{auth-service}'s \texttt{POST
+        /auth/admin/login} issues a \texttt{jose}-signed HS256 JWT (1-day expiry)
+        after checking a \texttt{bcryptjs} password hash. \texttt{ecomm-ui} stores
+        the token in an httpOnly \texttt{admin\_token} cookie
+        (\texttt{/api/admin/login/route.ts}), and \texttt{middleware.ts} verifies
+        that cookie for requests to \texttt{/admin/*} pages. The underlying API
+        routes those pages call are not covered by this check.
+  \item \textbf{Standard user login.} \texttt{auth-service}'s \texttt{POST
+        /auth/user/login} checks the password hash and returns user data but does
+        not issue a token. \texttt{ecomm-ui}'s login page notes this directly in a
+        comment: \texttt{// In a real app, save token/session here}. No
+        user-scoped session exists after a successful login.
+\end{itemize}
+
+\section{Payment Confirmation}\label{sec:sec-payments}
+\texttt{payments-service} creates a Stripe Checkout Session and a \texttt{pending}
+\texttt{Order} record. When Stripe redirects the browser back to
+\texttt{/checkout/success}, that page calls \texttt{POST /api/orders/confirm} with
+the \texttt{orderId} and \texttt{sessionId} from the URL. The route does not call
+Stripe to verify the session before updating the order; it sets \texttt{status:
+"paid"} directly. The frontend's own source acknowledges this:
+
+\begin{lstlisting}[language={}, caption={\texttt{src/app/(store)/checkout/success/page.tsx}}]
+// In a real production app, you would verify the session status
+// with your backend here, or use a Stripe Webhook to mark the order paid.
+// For this tutorial, we will trust the redirect.
+\end{lstlisting}
+
+No Stripe webhook handler exists in \texttt{payments-service} or elsewhere in the
+repositories. Order confirmation currently depends on the client reaching the
+success URL, not on a verified payment event.
+
+\section{Secrets Management}\label{sec:sec-secrets}
+Secrets are handled in two different ways across the repository:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Automated deployment (\texttt{deploy.yml}).} \texttt{JWT\_SECRET},
+        \texttt{STRIPE\_SECRET\_KEY}, \texttt{ADMIN\_EMAIL}, and
+        \texttt{ADMIN\_PASSWORD} are read from encrypted GitHub Actions secrets and
+        written into a Kubernetes Secret (\texttt{app-secrets}) at deploy time.
+        The same \texttt{ADMIN\_EMAIL} secret is also passed to cert-manager's
+        \texttt{letsencrypt-prod} \texttt{ClusterIssuer} as the ACME registration
+        email (Section~\ref{sec:bootstrap-pipeline}).
+        \texttt{DEPLOYMENT.md} documents an equivalent manual path using a
+        gitignored \texttt{.env} file. Neither commits real secret values to Git.
+  \item \textbf{Plaintext values in \texttt{values.yaml}.}
+        \texttt{helm/ecommerce-app/values.yaml} also contains a plaintext
+        \texttt{secrets:} block with a JWT secret, a Stripe secret key in live key
+        format, and a default admin email/password. No Helm template references
+        \texttt{.Values.secrets}, so the block does not affect what gets deployed.
+        It should still be removed and the associated credentials rotated, since it
+        remains in the repository's Git history.
+\end{itemize}
+
+OCI Vault integration is referenced in \texttt{DEPLOYMENT.md}, which lists three
+GitHub secret names implying Vault-stored OCIDs
+(\texttt{VAULT\_OCIR\_AUTH\_TOKEN\_OCID}, \texttt{VAULT\_STRIPE\_SECRET\_KEY\_OCID},
+\texttt{VAULT\_JWT\_SECRET\_OCID}). None of these names appear in any Terraform file
+or GitHub Actions workflow, and no Vault resource exists in
+\texttt{Terraform-code}; secrets are managed through Kubernetes Secrets instead.
+
+\section{IAM}\label{sec:sec-iam}
+\texttt{main.tf} contains a commented-out dynamic group and IAM policy for OKE
+worker access to images and secrets, with an inline note that the team did not have
+tenancy-level access to create dynamic groups. The current deployment uses a static
+OCIR authentication token (\texttt{ocir-secret}, a Kubernetes
+\texttt{docker-registry} Secret) instead.
+
+\section{Data Layer}\label{sec:sec-data}
+MongoDB is deployed as a single replica
+(\texttt{helm/ecommerce-app/\allowbreak templates/\allowbreak mongodb.yaml}) with no
+authentication configured. Any pod that can reach the \texttt{mongodb} ClusterIP
+Service in the namespace can read or write every collection without credentials, and
+the single-replica deployment is a shared dependency for all five workloads with no
+built-in redundancy.
+
+\section{Pod-Level Hardening}\label{sec:sec-pod}
+Every workload's Deployment sets \texttt{securityContext: runAsNonRoot: true} with an
+explicit non-root UID (1000 for the four backend services, 1001 for
+\texttt{ecomm-ui}), matching each Dockerfile's own \texttt{USER} directive, applied
+consistently across all five workloads.

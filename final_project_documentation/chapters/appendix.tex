@@ -1,40 +1,183 @@
 \appendix
-\renewcommand{\appendixtocname}{Appendix}
-\renewcommand{\appendixpagename}{\appendixtocname}
-\addappheadtotoc
-\setboolean{@twoside}{false}
-\appendixpage
 
-\section{Glossary}\label{sec:appendix-glossary}
-\begin{table}[H]
-\centering
-\caption{Terms used throughout this documentation.}
-\label{tab:glossary}
-\small
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm} X}
+\chapter{Glossary}\label{sec:appendix-glossary}
+\begin{longtable}{>{\raggedright\arraybackslash}p{2.6cm} p{\dimexpr\textwidth-2.6cm-4\tabcolsep-12pt\relax}}
+\caption{Terms used throughout this documentation.}\label{tab:glossary}\\
 \toprule
 \textbf{Term} & \textbf{Meaning} \\
 \midrule
+\endfirsthead
+\multicolumn{2}{c}{\textit{Table~\ref{tab:glossary} continued}} \\
+\toprule
+\textbf{Term} & \textbf{Meaning} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{2}{r}{\textit{Continued on next page}} \\
+\endfoot
+\bottomrule
+\endlastfoot
 OKE & Oracle Kubernetes Engine: OCI's managed Kubernetes service. \\
 OCIR & Oracle Cloud Infrastructure Registry: the container image registry each service pushes to. \\
 NSG & Network Security Group: a firewall attached to individual resources rather than a whole subnet. \\
 HPA & Horizontal Pod Autoscaler: scales a Deployment's replica count between a minimum and maximum based on resource utilization. \\
-BFF & Backend for Frontend: here, \texttt{ecomm-ui}'s own API routes, most of which proxy to the corresponding backend service, though \texttt{ecomm-ui} also holds its own direct MongoDB connection alongside that proxying. \\
+BFF & Backend for Frontend: here, \texttt{ecomm-ui}'s own \texttt{/api/*} routes, which proxy to the corresponding backend service over HTTP. This is the only inter-service orchestration in the system -- the backend services never call each other. \\
 GitOps & A deployment model where the desired state of the cluster lives in a Git repository, and an operator (ArgoCD) continuously reconciles the live cluster to match it. \\
 Helm chart & A templated bundle of Kubernetes manifests, parameterized by a single \texttt{values.yaml} file. \\
 ArgoCD & The GitOps controller that watches the Helm chart in \texttt{Terraform-code} and applies it to the cluster. \\
 PVC & Persistent Volume Claim: a request for durable storage, here backing the shared MongoDB deployment. \\
 ClusterIP & A Kubernetes Service type reachable only from inside the cluster, used for internal service-to-service calls. \\
 kube-proxy & The per-node Kubernetes component that implements Service-to-Pod routing; the Load Balancer's health check queries it directly on each worker node. \\
-Liveness/\allowbreak readiness probe & Kubernetes health checks against a pod: a failed liveness probe restarts the container, a failed readiness probe removes it from Service routing without restarting it. \\
+VCN & Virtual Cloud Network: OCI's software-defined network, the container for every subnet, gateway, and NSG in this design. \\
+NAT Gateway & Provides outbound-only internet access for the private Worker Nodes and Pods subnets. \\
+Service Gateway & Provides a private path from the private subnets to other OCI services (e.g.\ OCIR) without transiting the NAT Gateway. \\
+\end{longtable}
+
+\clearpage
+\chapter{Network Configuration Reference}\label{sec:appendix-network}
+Every ingress and egress rule attaches at the resource level through a Network
+Security Group rather than a subnet-wide security list. Tables~\ref{tab:nsg-api}
+through~\ref{tab:nsg-lb} list the rules declared in
+\texttt{modules/network/locals.tf} for each of the four subnets
+(Section~\ref{sec:domain-context}). Rows marked \emph{optional, enabled} come from a
+boolean toggle that defaults to \texttt{false} in the network module but is set to
+\texttt{true} in the root module (\texttt{main.tf}); see
+Section~\ref{sec:sec-network}.
+
+\begin{table}[H]
+\centering
+\caption{Gateways attached to the VCN.}
+\label{tab:gateways}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.8cm}
+                >{\raggedright\arraybackslash}p{4cm}
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Gateway} & \textbf{Attached to} & \textbf{Purpose} \\
+\midrule
+Internet Gateway & API Endpoint, Load Balancer subnets & Inbound/outbound internet access for public subnets \\
+NAT Gateway & Worker Nodes, Pods subnets & Outbound-only internet access for private subnets \\
+Service Gateway & Worker Nodes, Pods subnets & Private, fast path to OCI services (e.g.\ OCIR) without using NAT \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Command Reference}\label{sec:appendix-command-reference}
 \begin{table}[H]
 \centering
-\caption{Commands referenced in this documentation, drawn from \texttt{Terraform-code/DEPLOYMENT.md}.}
+\caption{Route tables for each subnet.}
+\label{tab:route-tables}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.6cm}
+                >{\raggedright\arraybackslash}X l}
+\toprule
+\textbf{Subnet} & \textbf{Destination} & \textbf{Target} \\
+\midrule
+API Endpoint (public) & 0.0.0.0/0 & Internet Gateway \\
+Load Balancer (public) & 0.0.0.0/0 & Internet Gateway \\
+Worker Nodes (private) & All region services in Oracle Services Network & Service Gateway \\
+Worker Nodes (private) & 0.0.0.0/0 & NAT Gateway \\
+Pods (private) & All region services in Oracle Services Network & Service Gateway \\
+Pods (private) & 0.0.0.0/0 & NAT Gateway \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{NSG rules for the Kubernetes API Endpoint subnet.}
+\label{tab:nsg-api}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}p{3.4cm} l X}
+\toprule
+\textbf{Direction} & \textbf{Peer} & \textbf{Port} & \textbf{Description} \\
+\midrule
+Ingress & \textbf{0.0.0.0/0} & TCP 6443 & External access to the Kubernetes API endpoint -- not restricted to team IPs \\
+Ingress & Worker Nodes CIDR & TCP 6443, 12250 & Worker to API endpoint communication \\
+Ingress & Pods CIDR & TCP 6443, 12250 & Pod to API endpoint communication (VCN-native) \\
+Ingress & Worker Nodes CIDR & ICMP 3,4 & Path MTU Discovery \\
+Egress & OCI Services Network & TCP 443 & API endpoint to OKE communication \\
+Egress & Pods CIDR & ALL & API endpoint to pod communication (VCN-native) \\
+Egress & Worker Nodes CIDR & ICMP 3,4 (two rules) & Path MTU Discovery \\
+Egress & Worker Nodes CIDR & TCP 10250 & API endpoint to worker node communication \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{NSG rules for the Worker Nodes subnet.}
+\label{tab:nsg-workers}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}p{3.4cm} l X}
+\toprule
+\textbf{Direction} & \textbf{Peer} & \textbf{Port} & \textbf{Description} \\
+\midrule
+Ingress & Worker Nodes CIDR & ALL & Communication between worker nodes \\
+Ingress & Pods CIDR & ALL & Pods on one node reach pods on other nodes \\
+Ingress & API Endpoint CIDR & TCP ALL & API endpoint to worker node communication \\
+Ingress & 0.0.0.0/0 & ICMP 3,4 & Path MTU Discovery \\
+Ingress & Load Balancer CIDR & TCP 10256 & LB to kube-proxy health check on worker nodes \\
+Ingress & \textbf{0.0.0.0/0} (optional, enabled) & TCP 22 & SSH access for troubleshooting \\
+Ingress & \textbf{0.0.0.0/0} (optional, enabled) & TCP 30000--32767 & Direct NodePort traffic, bypassing the Load Balancer \\
+Egress & Worker Nodes CIDR & ALL & Communication between worker nodes \\
+Egress & Pods CIDR & ALL & Worker nodes reach pods on other nodes \\
+Egress & 0.0.0.0/0 & ICMP 3,4 & Path MTU Discovery \\
+Egress & OCI Services Network & TCP ALL & Nodes communicate with OKE \\
+Egress & API Endpoint CIDR & TCP 6443, 12250 & Worker to API endpoint communication \\
+Egress & \textbf{0.0.0.0/0} (optional, enabled) & TCP ALL & General outbound internet access \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{NSG rules for the Pods subnet.}
+\label{tab:nsg-pods}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}p{3.4cm} l X}
+\toprule
+\textbf{Direction} & \textbf{Peer} & \textbf{Port} & \textbf{Description} \\
+\midrule
+Ingress & API Endpoint CIDR & ALL & API endpoint to pod communication \\
+Ingress & Worker Nodes CIDR & ALL & Pods on one node reach pods on other nodes \\
+Ingress & Pods CIDR & ALL & Pods communicate with each other \\
+Egress & Pods CIDR & ALL & Pods communicate with each other \\
+Egress & OCI Services Network & ICMP 3,4 & Path MTU Discovery \\
+Egress & OCI Services Network & TCP ALL & Pods communicate with OCI services \\
+Egress & API Endpoint CIDR & TCP 6443, 12250 & Pod to API endpoint communication \\
+Egress & \textbf{0.0.0.0/0} (optional, enabled) & TCP 443 & Outbound internet access \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{NSG rules for the Load Balancer subnet.}
+\label{tab:nsg-lb}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}p{3.4cm} l X}
+\toprule
+\textbf{Direction} & \textbf{Peer} & \textbf{Port} & \textbf{Description} \\
+\midrule
+Ingress & 0.0.0.0/0 & TCP 80 & Public HTTP traffic to the Load Balancer \\
+Ingress & 0.0.0.0/0 & TCP 443 & Public HTTPS traffic to the Load Balancer \\
+Egress & Worker Nodes CIDR & TCP 30000--32767 & LB forwards traffic to worker nodes \\
+Egress & Worker Nodes CIDR & TCP 10256 & LB communicates with kube-proxy health check \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The rules marked \emph{optional, enabled} come from boolean switches in
+\texttt{modules/network/variables.tf} (SSH access, general worker outbound, pod
+outbound internet, and public NodePort access) that default to \texttt{false}; the
+root module sets all four to \texttt{true}. See Section~\ref{sec:sec-network} for
+the security implications.
+
+\clearpage
+\chapter{Command Reference}\label{sec:appendix-command-reference}
+\begin{table}[H]
+\centering
+\caption{Commands used to deploy, operate, and tear down the system, from \texttt{Terraform-code/DEPLOYMENT.md}.}
 \label{tab:command-reference}
 \small
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{5.4cm} X}
@@ -43,8 +186,11 @@ Liveness/\allowbreak readiness probe & Kubernetes health checks against a pod: a
 \midrule
 \code{terraform init / plan / apply} & Provision the VCN, subnets, OKE cluster, and OCIR repositories \\
 \code{oci ce cluster create-kubeconfig} & Generate a local \texttt{kubectl} context for the OKE cluster \\
+\code{./scripts/\allowbreak build\_and\_push.sh <region> <namespace> <tag> <compartment>} & Build and push all five images to OCIR in one step \\
+\code{kubectl create secret docker-registry ocir-secret ...} & Create the image-pull Secret from an OCI Auth Token \\
+\code{kubectl create secret generic app-secrets --from-env-file=.env} & Create the application Secret from a local, gitignored \texttt{.env} file \\
 \code{kubectl apply -f ./kubernetes/} & Apply the raw Kubernetes manifests directly (the non-GitOps deployment path) \\
-\code{helm install ecommerce ./helm/ecommerce-app -n ecommerce-ns} & Deploy the application through the Helm chart \\
+\code{helm install ecommerce ./helm/ecommerce-app -n ecommerce-ns} & Deploy the application through the Helm chart (the GitOps-managed path) \\
 \code{kubectl rollout restart deployment -n ecommerce-ns} & Restart all microservice deployments in the namespace \\
 \code{helm uninstall ecommerce -n ecommerce-ns} & Remove the Helm-managed application before infrastructure teardown \\
 \code{terraform destroy} & Tear down the OKE cluster and network once the application layer is removed \\

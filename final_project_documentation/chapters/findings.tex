@@ -1,63 +1,40 @@
-\chapter{Deployment Results and Verification}\label{chap:results}
+\chapter{System Components and Runtime Behavior}\label{chap:results}
 
-In this chapter, we present the system as it is actually configured to deploy, based on
-the committed Terraform configuration, Kubernetes manifests, Helm chart, and CI/CD
-workflows in the \texttt{Ejada-A} repositories, rather than as designed on paper.
-
-\section{The Five Services, as Deployed}\label{sec:primary-finding-one}
-Figure~\ref{fig:topology} is the team's own architecture diagram for the deployed
-system: the full path from a developer or shopper, through the public subnets, into the
-private worker nodes and pods, and out to OCIR for image pulls.
-
-\begin{figure}[p]
-\centering
-\includegraphics[width=\textwidth]{Figures/week4Architecture.png}
-\caption{Deployed architecture inside VCN \texttt{groupa-dev-vcn} (\texttt{10.0.0.0/16}).
-A developer reaches the OKE API endpoint over \texttt{HTTPS/6443} through the Internet
-Gateway; shoppers reach the Load Balancer over \texttt{HTTPS:443}. Both public subnets
-route into the private Worker Nodes subnet (\texttt{10.0.16.0/20}, two nodes, egress via
-NAT Gateway) and Pods subnet (\texttt{10.0.32.0/19}, five services plus the shared
-MongoDB PVC), which reaches OCI services, including pulling images from the OCIR
-Registry, through the Service Gateway rather than the NAT path.}
-\label{fig:topology}
-\end{figure}
-
-Figure~\ref{fig:app-access} narrows in on the application layer: the Ingress
-Controller's path-based routing to each of the five workloads, and the shared MongoDB
-instance every one of them, including the frontend itself, connects to directly.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.92\textwidth]{Figures/appAccessStructure.png}
-\caption{Application-layer access structure. The Ingress routes by path to
-\texttt{ecomm-ui} and each of the four backend services by their internal ClusterIP
-service name and port; every workload, including \texttt{ecomm-ui} itself, holds its own
-connection to the single shared MongoDB instance.}
-\label{fig:app-access}
-\end{figure}
-
-This corrects a simplification worth flagging: \texttt{ecomm-ui} is not a pure
-stateless proxy in front of the four backend services. Most of its API routes do proxy
-to the corresponding backend service, but it also holds its own direct MongoDB
-connection (\texttt{src/lib/db.ts}) alongside that proxying.
-
-Each backend service builds and pushes to its own OCIR repository under
-\texttt{jed.ocir.io/axkjllkftxfz/shared-group-a-cmp/}, matching the domain boundaries set
-out in Table~\ref{tab:domain-ownership}: \texttt{auth-service}, \texttt{products-service},
-\texttt{orders-service}, \texttt{payments-service}, and \texttt{ecomm-ui}. The
-one-repository-per-service pattern matches the registry design in
-Section~\ref{sec:app-layer-design}, though the repository names themselves moved from
-the design phase's \texttt{groupa-*-app} convention to the plural, per-service names
-above.
-
-\section{Traffic Routing and Autoscaling}\label{sec:primary-finding-two}
-The ingress resource performs path-based routing from the single public host to each
-backend service, as set out in Table~\ref{tab:ingress-routing}; compare this against the
-routing designed during the assessment phase in Table~\ref{tab:routing-design}.
+\section{Component Reference}\label{sec:primary-finding-one}
+Table~\ref{tab:component-reference} lists the deployed workloads, their OCIR
+repositories, and their ports.
 
 \begin{table}[H]
 \centering
-\caption{Path-based routing rules deployed in the ingress resource.}
+\caption{Deployed workloads and ports.}
+\label{tab:component-reference}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3cm}
+                >{\raggedright\arraybackslash}X l}
+\toprule
+\textbf{Component} & \textbf{OCIR repository} & \textbf{Port} \\
+\midrule
+\texttt{ecomm-ui} & \texttt{shared-\allowbreak group-\allowbreak a-cmp/\allowbreak ecomm-ui} & container 3000, Service 80 (LoadBalancer) \\
+\texttt{auth-service} & \texttt{shared-\allowbreak group-\allowbreak a-cmp/\allowbreak auth-\allowbreak service} & 5001 \\
+\texttt{products-\allowbreak service} & \texttt{shared-\allowbreak group-\allowbreak a-cmp/\allowbreak products-\allowbreak service} & 5002 \\
+\texttt{orders-\allowbreak service} & \texttt{shared-\allowbreak group-\allowbreak a-cmp/\allowbreak orders-\allowbreak service} & 5003 \\
+\texttt{payments-\allowbreak service} & \texttt{shared-\allowbreak group-\allowbreak a-cmp/\allowbreak payments-\allowbreak service} & 5004 \\
+\texttt{mongodb} & \texttt{docker.io/\allowbreak library/\allowbreak mongo:7.0} (not OCIR) & 27017 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\texttt{values.yaml} currently records image tags 17 (auth), 11 (products), 9
+(orders), 8 (payments), and 11 (ecomm-ui), reflecting multiple runs of the GitOps
+pipeline.
+
+\section{Request Routing}\label{sec:primary-finding-two}
+Table~\ref{tab:ingress-routing} shows the path-based routing defined in the ingress
+resource.
+
+\begin{table}[H]
+\centering
+\caption{Ingress routing rules.}
 \label{tab:ingress-routing}
 \small
 \begin{tabular}{lll}
@@ -73,17 +50,38 @@ routing designed during the assessment phase in Table~\ref{tab:routing-design}.
 \end{tabular}
 \end{table}
 
-Every workload, including the frontend, scales independently through its own
-Horizontal Pod Autoscaler, deployed with a uniform policy across all five: a minimum of
-2 replicas and a maximum of 5, scaling on 75\% CPU utilization (the raw Kubernetes
-manifests additionally target 80\% memory utilization). This keeps every service at a
-minimum of two replicas for redundancy while capping the maximum to bound cost, in place
-of the per-service minimum and maximum designed during the assessment phase
-(Table~\ref{tab:hpa-design}).
+The ingress host is \texttt{shoy.publicvm.com}, with a TLS block referencing a
+\texttt{shoy-tls-secret}. That certificate is provisioned automatically: the
+bootstrap workflow installs cert-manager and a \texttt{letsencrypt-prod}
+\texttt{ClusterIssuer} using the HTTP-01 solver through the NGINX ingress class,
+so \texttt{shoy-tls-secret} is issued by Let's Encrypt rather than created by hand
+(Section~\ref{sec:bootstrap-pipeline}).
 
-Table~\ref{tab:resource-sizing} lists the CPU and memory each pod requests and is capped
-at; the four backend services all use the identical values, while the frontend and the
-shared MongoDB instance are sized larger.
+\section{Scaling and Resource Allocation}\label{sec:scaling-resource-allocation}
+\begin{warningbox}[Autoscaling Configuration]
+The Helm chart (\texttt{helm/ecommerce-app/templates/hpa.yaml}), which ArgoCD
+reconciles, scales every workload on CPU utilization only, at 75\%. The raw manifest
+(\texttt{kubernetes/06-hpa.yaml}) scales the same workloads on both CPU (75\%) and
+memory (80\%). Table~\ref{tab:hpa-actual} shows the Helm policy, since that is the
+one GitOps keeps live.
+\end{warningbox}
+
+\begin{table}[H]
+\centering
+\caption{HPA policy (Helm chart), uniform across all five workloads.}
+\label{tab:hpa-actual}
+\small
+\begin{tabularx}{\textwidth}{l l >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Min replicas} & \textbf{Max replicas} & \textbf{Scaling target} \\
+\midrule
+2 & 5 & 75\% CPU (Helm) -- or 75\% CPU + 80\% memory (raw manifest only) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Table~\ref{tab:resource-sizing} lists per-pod CPU and memory requests and limits;
+the four backend services use identical values.
 
 \begin{table}[H]
 \centering
@@ -101,65 +99,62 @@ shared MongoDB instance are sized larger.
 \end{tabularx}
 \end{table}
 
-These per-pod values are a separate sizing decision from the node pool's own compute
-shape in Section~\ref{sec:assumptions-limitations}: the node pool sizing bounds how much
-total CPU and memory each worker node has to offer, while these requests and limits
-bound how much of that capacity any single pod can claim. The HPA scales replica
-\emph{count} against these per-pod requests, not against the node pool directly.
+\section{Frontend Implementation Status}\label{sec:frontend-completeness}
+Table~\ref{tab:frontend-status} summarises the current implementation status of
+the storefront and administration pages.
 
-\section{The GitOps Deployment Pipeline}\label{sec:primary-finding-three}
-The \texttt{argocd/ecommerce-app.yaml} Application resource, once applied, points ArgoCD
-at the \texttt{helm/ecommerce-app} path of the \texttt{Terraform-code} repository:
+\begin{table}[H]
+\centering
+\caption{Frontend implementation status.}
+\label{tab:frontend-status}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm}
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Page / feature} & \textbf{Status} \\
+\midrule
+Homepage (\texttt{/}) & Working -- fetches from \texttt{products-service}, renders the first 10 products \\
+Cart (\texttt{/cart}), checkout (\texttt{/checkout}) & Working -- cart is client-side state (React Context + \texttt{localStorage}); checkout creates a Stripe Checkout Session \\
+Admin products / orders management & Working -- full CRUD via Next.js Server Actions and BFF routes calling the backend services directly \\
+All-products listing (\texttt{/products}) & Incomplete -- displays placeholder content; the fetch and rendering logic is sketched out in code comments \\
+Product detail (\texttt{/products/[id]}) & Incomplete -- same pattern; there is currently no way to view a single product's detail page or add to cart from it \\
+Categories (\texttt{/categories}) & Incomplete -- same pattern \\
+Admin dashboard KPIs (\texttt{/admin}) & Displays static placeholder metrics (e.g.\ ``\$45,231.89'' revenue, ``356'' orders) rather than data computed from the running system \\
+User login/registration & Credentials are validated server-side; no session or token is issued afterward (Section~\ref{sec:sec-app-auth}) \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
-\begin{lstlisting}[caption={\texttt{Terraform-code/argocd/ecommerce-app.yaml}}]
-spec:
-  source:
-    repoURL: 'https://github.com/Ejada-A/Terraform-code.git'
-    path: helm/ecommerce-app
-  destination:
-    namespace: ecommerce-ns
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-\end{lstlisting}
+A second cart implementation using Zustand (\texttt{src/hooks/useCart.ts}) also
+exists in the repository; it is imported by one component
+(\texttt{components/modules/products/ProductCard.tsx}) that is not rendered by any
+page currently in use. The cart implementation used by the working pages is
+\texttt{src/context/CartContext.tsx}.
 
-With \texttt{selfHeal} enabled, a manual \texttt{kubectl edit} against a live Deployment
-would be reverted on the next reconciliation; the Helm chart in Git is the only path
-ArgoCD treats as authoritative, matching the source-of-truth split described in
-Section~\ref{sec:data-evidence-weighting}.
+\section{Validation Approach}\label{sec:validation-approach}
+\label{sec:quant-comparative-scenario}
+This documentation is based on a review of all six \texttt{Ejada-A} repositories:
+application source, Terraform configuration, Helm charts, Kubernetes manifests, and
+CI/CD workflows. Claims were cross-referenced across repositories -- for example,
+checking that an environment variable a service reads matches what the
+ConfigMap or Secret actually provides. Table~\ref{tab:evidence-commits} records the
+commit each repository was reviewed at.
 
-\section{Verification Performed}\label{sec:quant-comparative-scenario}
-This documentation was compiled from the repositories under the \texttt{Ejada-A} GitHub
-organization rather than from a live session against the running cluster. What we
-verified directly:
-
-\begin{itemize}[leftmargin=1.4em]
-  \item every ingress path, port, and HPA threshold in
-        Section~\ref{sec:primary-finding-two} was read directly from the committed
-        Kubernetes manifests and the Helm chart's templates and \texttt{values.yaml};
-  \item the image-promotion pipeline in Section~\ref{sec:evaluation-criteria} was traced
-        through each service's own \texttt{ci.yml} and the shared
-        \texttt{update-helm.yml} workflow; and
-  \item the domain-to-service mapping in Table~\ref{tab:domain-ownership} was confirmed
-        against each service's own \texttt{server.ts} and data models.
-\end{itemize}
-
-We have not independently confirmed these against a live \texttt{kubectl get pods} or a
-request against the public load balancer at the time of writing this documentation.
-
-\section{Open Implementation Decisions}\label{sec:risk-analysis}
-Two decisions were explicitly left open during the assessment phase and resolved with a
-concrete default during the Terraform and Kubernetes build:
-
-\begin{itemize}[leftmargin=1.4em]
-  \item the OKE node pool's compute shape and OCPU/memory split, defaulted to
-        \texttt{VM.Standard.A1.Flex} at 2 OCPUs and 16\,GB; and
-  \item the database engine per service, resolved as one shared MongoDB instance for all
-        five services rather than a separate database per service.
-\end{itemize}
-
-\section{Key Unknowns}\label{sec:key-unknowns}
-This build does not cover multi-region or multi-availability-domain high availability,
-an HTTPS listener on the ingress, or load testing against the deployed autoscaling
-thresholds; all three are out of scope for this documentation rather than open failures.
+\begin{table}[H]
+\centering
+\caption{Repositories and commits this documentation reflects.}
+\label{tab:evidence-commits}
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Repository} & \textbf{Commit} \\
+\midrule
+\texttt{auth-service} & \texttt{f6a4ca1} \\
+\texttt{products-service} & \texttt{b45b8cb} \\
+\texttt{orders-service} & \texttt{f63ecd4} \\
+\texttt{payments-service} & \texttt{83cd162} \\
+\texttt{ecomm-ui} & \texttt{197e0e7} \\
+\texttt{Terraform-code} & \texttt{ebfdc17} \\
+\bottomrule
+\end{tabular}
+\end{table}

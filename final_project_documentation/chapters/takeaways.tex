@@ -1,52 +1,71 @@
-\chapter{Conclusions}\label{chap:concl}
+\chapter{Limitations and Future Improvements}\label{chap:limitations}
 
-\section{Main Conclusion}\label{sec:main-conclusion}
-The system we built implements the four-domain microservice split identified in the
-assessment phase as a 1:1 mapping to five Git repositories (four backend services plus
-the frontend), deployed to OKE through a fully GitOps-driven pipeline: each service's
-own CI builds and pushes its image, a shared workflow promotes that image's tag into the
-Helm chart, and ArgoCD reconciles the cluster automatically from that chart. That
-answers the objective set out in Section~\ref{sec:core-question} directly: the
-data-ownership analysis from the assessment phase is traceable, service by service, into
-the repositories and deployment configuration described in Chapter~\ref{chap:results}.
+\begin{warningbox}[Current Limitations]
+A few areas are still early or incomplete. Backend services and BFF routes do not
+yet enforce authorization before mutating data (Section~\ref{sec:sec-app-auth}),
+and regular users are not issued a session or token. Payment confirmation
+currently relies on a client call rather than a Stripe webhook or session check
+(Section~\ref{sec:sec-payments}). The \texttt{/products}, \texttt{/products/[id]},
+and \texttt{/categories} pages are still placeholders
+(Section~\ref{sec:frontend-completeness}), as is the admin dashboard's metrics
+display. MongoDB runs without authentication or redundancy
+(Section~\ref{sec:sec-data}), and \texttt{values.yaml} still carries an unused
+plaintext secrets block worth cleaning up (Section~\ref{sec:sec-secrets}). The
+Kubernetes API endpoint, worker SSH, and the NodePort range are currently
+reachable from \texttt{0.0.0.0/0} (Section~\ref{sec:sec-network}), and the Helm
+chart and raw Kubernetes manifests define slightly different HPA policies
+(Section~\ref{sec:scaling-resource-allocation}). Automated tests are not yet part
+of any of the six repositories, and a few frontend dependencies (\texttt{zod},
+\texttt{next-auth}, \texttt{bcryptjs} in \texttt{ecomm-ui}) are declared but not
+yet used.
+\end{warningbox}
 
-\section{Strongest Supporting Evidence}\label{sec:strongest-evidence}
-Three pieces of evidence carry the most weight for this conclusion:
+\section{Recommended Next Steps}\label{sec:recommended-actions}
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{Verify Stripe payments server-side} by replacing the
+        client-triggered \texttt{/api/orders/confirm} call with a webhook that
+        checks the event signature before marking an order paid.
+  \item \textbf{Complete the \texttt{/products}, \texttt{/products/[id]}, and
+        \texttt{/categories} pages}; the fetch and rendering logic is already
+        sketched out in code comments in each file.
+  \item \textbf{Remove the plaintext secrets block} in \texttt{values.yaml} and
+        rotate the associated credentials.
+  \item \textbf{Restrict the currently-public network paths}: scope the Kubernetes
+        API endpoint and worker SSH access to known IPs instead of
+        \texttt{0.0.0.0/0}, and disable the direct NodePort path now that the
+        Ingress Controller is in place.
+  \item \textbf{Enable MongoDB authentication} and consider whether the five
+        workloads should keep sharing one instance and one set of collections.
+\end{enumerate}
 
+\section{Monitoring Recommendations}\label{sec:monitoring-indicators}
+\begin{table}[H]
+\centering
+\caption{Indicators worth monitoring as this deployment matures.}
+\label{tab:monitoring-indicators}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Indicator} & \textbf{Why It Matters} & \textbf{Review Frequency} \\
+\midrule
+Per-workload HPA CPU utilization vs.\ the 75\% threshold & Signals whether the uniform autoscaling policy fits each service's actual traffic shape & Ongoing \\
+ArgoCD sync status for \texttt{ecommerce-app} & Confirms the running cluster still matches the Helm chart in \texttt{Terraform-code} & Continuous, via ArgoCD's own dashboard \\
+MongoDB PVC utilization (10Gi, shared, single replica) & Signals capacity pressure on the one database instance every workload depends on & Monthly \\
+Requests to \texttt{/api/orders/confirm} & This route does not verify the underlying Stripe session (Section~\ref{sec:sec-payments}) & Until webhook-based verification is added \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Open Questions}\label{sec:open-questions}
 \begin{itemize}[leftmargin=1.4em]
-  \item \textbf{The domain-ownership table matches the repository split exactly.} Each
-        domain in Table~\ref{tab:domain-ownership} corresponds to exactly one service
-        repository and one OCIR image, with no domain spread across two repositories.
-  \item \textbf{The Terraform network module generalizes cleanly.} The same
-        \texttt{for\_each}-over-flattened-rules pattern used for four subnets in earlier
-        weeks was reused here without modification to the resource blocks themselves.
-  \item \textbf{The GitOps pipeline is fully wired, end to end, in committed
-        configuration.} Every step from a code push to a cluster reconciliation, in
-        Section~\ref{sec:evaluation-criteria}, is defined in a workflow or manifest file
-        we read directly, not asserted from memory.
+  \item whether the raw \texttt{kubernetes/} manifests should be retired now that
+        ArgoCD manages the Helm chart, given the two already define different
+        autoscaling policies;
+  \item whether the shared MongoDB instance should be split per service before this
+        architecture is reused beyond the internship context; and
+  \item whether the OKE IAM dynamic group policy, currently commented out in
+        \texttt{main.tf} for lack of tenancy access, should be revisited once
+        broader access is available.
 \end{itemize}
-
-\section{Biggest Uncertainty}\label{sec:biggest-uncertainty}
-The largest open item is that two implementation decisions, the OKE node pool's compute
-sizing and the database engine per service, were left unspecified during the assessment
-phase and resolved with a working default during the build rather than a deliberate
-choice made upfront. Reducing that uncertainty means deliberately revisiting both
-defaults against the application's actual resource usage, rather than leaving them at
-whatever the Terraform and Helm defaults happened to be.
-
-\section{Strategic Implications and Recommendation}\label{sec:strategic-implications}
-The current architecture is appropriate as a working implementation of the assessment
-phase's domain boundaries. Before treating the compute sizing and shared-database
-decisions as final, we would revisit both deliberately, each already a one-line change
-in the existing configuration rather than a restructuring: the node shape and
-OCPU/memory split are Terraform variables, and the database choice is a matter of
-provisioning a separate database per service and repointing the relevant
-\texttt{MONGODB\_URI} value.
-
-\section{Confidence Level and Final Judgement}\label{sec:confidence-final-judgement}
-Our confidence in the architecture and deployment-pipeline description in
-Chapter~\ref{chap:results} is \textbf{high}: every claim traces back to a specific file
-in a specific repository under the \texttt{Ejada-A} GitHub organization. Our confidence
-in how the system behaves once actually running is \textbf{lower}, since this
-documentation was compiled from the repositories themselves rather than from a live
-session against the deployed cluster, as noted in Section~\ref{sec:quant-comparative-scenario}.

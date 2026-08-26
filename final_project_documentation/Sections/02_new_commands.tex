@@ -1,7 +1,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Define new commands related to the file:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\setlength{\parindent}{12pt} %determine font size
+\setlength{\parindent}{0pt} %no first-line paragraph indentation; parskip spaces paragraphs instead
 \renewcommand{\baselinestretch}{1.1} %determine spacing between lines
 \raggedbottom
 
@@ -112,3 +112,83 @@
 \lstset{style=hclstyle}
 \newcommand{\code}[1]{\texttt{\small #1}}
 \newcommand{\shellcmd}[1]{\texttt{\color{ThesisBlue}#1}}
+
+% ---------------------------------------------------------------------------
+% Heading style: technical-documentation look, not a thesis/book look.
+% Numbered like "1  Project Overview" / "1.1 Objectives and Scope", no
+% "Chapter N" prefix, minimal vertical whitespace, a thin accent rule under
+% chapter titles rather than a full blank chapter-opening page.
+% ---------------------------------------------------------------------------
+\titleformat{\chapter}[hang]
+  {\normalfont\Huge\bfseries\color{ThesisNavy}}
+  {\thechapter}
+  {0.6em}
+  {}
+\titlespacing*{\chapter}{0pt}{0pt}{18pt}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{ThesisNavy}}
+  {\thesection}{0.7em}{}
+\titlespacing*{\section}{0pt}{16pt}{6pt}
+
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{ThesisText}}
+  {\thesubsection}{0.6em}{}
+\titlespacing*{\subsection}{0pt}{12pt}{4pt}
+
+% Number subsections and show them in the ToC, matching how a reference
+% document is actually navigated (readers jump to "3.4 CI/CD Pipeline", not
+% to an unnumbered heading they can't cite).
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
+
+% ---------------------------------------------------------------------------
+% Page numbering: "Cloud Interns" running header, "Ejada Cloud 2026" plus a
+% zero-padded current/total page count in the footer (the book class forces
+% "plain" on every page regardless of \pagestyle elsewhere, so "plain" is
+% redefined directly rather than fought). \ifDocArabic switches the counter
+% display to plain arabic zero-padding once the front matter's roman-numeral
+% pages give way to the numbered body (set true right after
+% \pagenumbering{arabic} in main.tex).
+% ---------------------------------------------------------------------------
+\newif\ifDocArabic
+\newcommand{\zeropagenum}{\ifnum\value{page}<10 0\fi\arabic{page}}
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \renewcommand{\headrulewidth}{0pt}
+  \renewcommand{\footrulewidth}{0pt}
+  \fancyhead[L]{\small\sffamily\color{black}Cloud Interns}
+  \fancyfoot[L]{\small\sffamily\color{black}Ejada Cloud 2026}
+  \fancyfoot[R]{\small\sffamily\color{black}\ifDocArabic\zeropagenum\else\thepage\fi\;/\;\pageref{LastPage}}
+}
+\pagestyle{plain}
+
+% ---------------------------------------------------------------------------
+% Caption style: bold, small, label separated by a colon -- reference-doc
+% convention rather than the default italic thesis caption.
+% ---------------------------------------------------------------------------
+\captionsetup{
+  labelfont={bf,color=ThesisNavy},
+  font=small,
+  labelsep=colon,
+  skip=6pt
+}
+
+% ---------------------------------------------------------------------------
+% Callout boxes: for notes, warnings, and known-limitation flags inline in
+% the text, instead of burying that information in prose.
+% ---------------------------------------------------------------------------
+\newtcolorbox{infobox}[1][Note]{
+  breakable, enhanced, colback=ThesisLightBlue, colframe=ThesisBlue,
+  coltitle=white, colbacktitle=ThesisBlue,
+  boxrule=0.6pt, arc=1.5pt, left=6pt, right=6pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\sffamily\small,
+  title=#1,
+}
+\newtcolorbox{warningbox}[1][Limitation]{
+  breakable, enhanced, colback=ArchPurpleLight, colframe=ArchPurple,
+  coltitle=white, colbacktitle=ArchPurple,
+  boxrule=0.6pt, arc=1.5pt, left=6pt, right=6pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\sffamily\small,
+  title=#1,
+}

@@ -2,9 +2,9 @@
 %Copyrights: The Multi-Robot Systems Research Group - Mechatronics Engineering
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \documentclass[12pt,a4paper,oneside]{book}
-\include{Sections/01_class_and_packages}
-\include{Sections/02_new_commands}
-\include{Sections/03_Authors_info} %change your info
+\input{Sections/01_class_and_packages}
+\input{Sections/02_new_commands}
+\input{Sections/03_Authors_info} %change your info
 
 \begin{document}
 \include{Sections/04_titlepage}
@@ -12,13 +12,13 @@
 \include{Sections/09_abstract}
 \include{Sections/10_toc_figures_tables}
 %========================================================
-%redefine page style:
-\pagestyle{headings}
 \pagenumbering{arabic}
+\global\DocArabictrue
 %include chapters in the following part:
 %========================================
 \include{chapters/overview}
 \include{chapters/context_and_sources}
+\include{chapters/security}
 \include{chapters/approach}
 \include{chapters/findings}
 \include{chapters/takeaways}
@@ -28,11 +28,6 @@
 %Add the appendix here:
 %==========================
 \include{chapters/appendix}
-
-
-%Add the bibliography here:
-%=============================
-\include{chapters/bibliography}
 
 
 \end{document}

@@ -1,71 +1,118 @@
-\chapter{Implementation Approach}\label{chap:Methodology}
+\chapter{Infrastructure and Deployment}\label{chap:Methodology}
 
-This project reuses and extends the Terraform module structure already built in earlier
-weeks (the subnet module, the OKE module) rather than rebuilding infrastructure from
-scratch. In this chapter, we explain the mechanisms that make that configuration
-reusable across five services and safe to extend, and the pipeline that carries a code
-change from a service repository into the running cluster.
+This chapter covers how the OKE cluster is provisioned, how a code change reaches a
+running pod, and how to deploy and configure the system.
 
-\section{Building on the Existing Terraform Foundation}\label{sec:manual-console-build}
-Rather than a manual, console-first build, this project's starting point was the
-already-validated \texttt{network} and \texttt{oke} Terraform modules from earlier
-weeks. The root module (\texttt{Terraform-code/main.tf}) wires them together, resolves
-the latest Oracle Linux image for the chosen compute shape, and provisions one OCIR
-repository per microservice from a single \texttt{for\_each}:
-
-\begin{lstlisting}[caption={\texttt{Terraform-code/main.tf} -- one resource block, five OCIR repositories}]
-resource "oci_artifacts_container_repository" "microservices" {
-  for_each = local.microservices
-
-  compartment_id = var.compartment_ocid
-  display_name   = "shared-group-a-cmp/${each.value}"
-  is_public      = false
-  is_immutable   = false
-}
-\end{lstlisting}
-
-\texttt{local.microservices} is the set \texttt{auth-service}, \texttt{products-service},
-\texttt{orders-service}, \texttt{payments-service}, and \texttt{ecomm-ui}. Adding a sixth
-service later means adding one entry to that set, not writing a new resource block.
+\section{Terraform Module Structure}\label{sec:manual-console-build}
+The root module (\texttt{Terraform-code/main.tf}) wires together two child modules,
+\texttt{network} and \texttt{oke}, resolves the latest Oracle Linux 8 image for the
+chosen compute shape, and provisions one OCIR repository per microservice from a
+single \texttt{for\_each} over \texttt{local.microservices}. State is stored in an
+S3-compatible OCI Object Storage backend (\texttt{providers.tf}), not locally. The
+cluster runs Kubernetes v1.34.2, set explicitly in the \texttt{oke} module call.
 
 \subsection*{Module Interfaces}
-The \texttt{network} and \texttt{oke} modules are wired together strictly through typed
-inputs and outputs, not through any shared state outside Terraform. Figures~\ref{fig:network-module}
-and~\ref{fig:oke-module} set out each module's contract.
+Figure~\ref{fig:network-module} shows the \texttt{network} module's inputs and
+outputs, including four boolean access switches that default to \texttt{false} in
+the module itself (Section~\ref{sec:domain-context}).
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.92\textwidth]{Figures/networkModuleInterface.png}
-\caption{Interface of the \texttt{network} module. Required inputs fix identity/naming
-and network sizing; four boolean access switches and a flow-log toggle are optional.
-Outputs expose the VCN ID plus by-name lookup maps for subnets and NSGs, alongside four
-shortcut outputs for the individual subnet IDs.}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[font=\sffamily\footnotesize]
+\node[evalbox, minimum width=3.6cm, minimum height=9.4cm, text width=3.2cm, align=center] (mod) at (0,0)
+  {{\scriptsize\sffamily TERRAFORM MODULE}\\[10pt]{\Large\bfseries\color{ThesisNavy} Network}};
+
+\node[evalbox, minimum width=4.6cm, minimum height=1.7cm, text width=4.2cm] (in1) at (-6.4,3.4)
+  {\textbf{Identity \& Naming}\\{\scriptsize\ttfamily compartment\_ocid, project\_name}};
+\node[evalbox, minimum width=4.6cm, minimum height=1.7cm, text width=4.2cm] (in2) at (-6.4,1.1)
+  {\textbf{Network Sizing}\\{\scriptsize\ttfamily vcn\_cidr, subnets}};
+\node[specbox, minimum width=4.6cm, minimum height=1.7cm, text width=4.2cm] (in3) at (-6.4,-1.4)
+  {\textbf{Access Switches}\\{\scriptsize optional, 4 boolean flags}};
+\node[specbox, minimum width=4.6cm, minimum height=1.7cm, text width=4.2cm] (in4) at (-6.4,-3.7)
+  {\textbf{Flow Logs Toggle}\\{\scriptsize optional, \ttfamily enable\_flow\_logs}};
+
+\node[outputbox, minimum width=4.6cm, minimum height=1.7cm, text width=4.2cm] (out1) at (6.4,3.4)
+  {\textbf{Network ID}\\{\scriptsize\ttfamily vcn\_id}};
+\node[outputbox, minimum width=4.6cm, minimum height=1.7cm, text width=4.2cm] (out2) at (6.4,1.1)
+  {\textbf{Subnet Lookup}\\{\scriptsize\ttfamily subnet\_ids[name]}};
+\node[outputbox, minimum width=4.6cm, minimum height=1.7cm, text width=4.2cm] (out3) at (6.4,-1.4)
+  {\textbf{NSG Lookup}\\{\scriptsize\ttfamily nsg\_ids[name]}};
+\node[outputbox, minimum width=4.6cm, minimum height=1.7cm, text width=4.2cm] (out4) at (6.4,-3.7)
+  {\textbf{Direct Subnet IDs}\\{\scriptsize 4 shortcut outputs}};
+
+\draw[arrow] (in1.east) -- (mod.west |- in1);
+\draw[arrow] (in2.east) -- (mod.west |- in2);
+\draw[arrow] (in3.east) -- (mod.west |- in3);
+\draw[arrow] (in4.east) -- (mod.west |- in4);
+
+\draw[arrow] (mod.east |- out1) -- (out1.west);
+\draw[arrow] (mod.east |- out2) -- (out2.west);
+\draw[arrow] (mod.east |- out3) -- (out3.west);
+\draw[arrow] (mod.east |- out4) -- (out4.west);
+
+\node[note] at (-6.4,4.6) {\textsc{Input}};
+\node[note] at (6.4,4.6) {\textsc{Output}};
+\end{tikzpicture}
+}
+\caption{Terraform \texttt{network} module inputs and outputs. Solid nodes are required inputs and outputs; dashed nodes are the optional access and logging switches.}
 \label{fig:network-module}
 \end{figure}
 
+Figure~\ref{fig:oke-module} shows the \texttt{oke} module's interface; network
+placement and NSG IDs are consumed directly from the \texttt{network} module's
+outputs.
+
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.92\textwidth]{Figures/okeModuleInterface.png}
-\caption{Interface of the \texttt{oke} module. Two of its inputs, network placement and
-NSG IDs, are consumed directly from the \texttt{network} module's outputs rather than
-declared independently, which is what makes the root module's
-\texttt{module.oke \{ vcn\_id = module.network.vcn\_id, ... \}} wiring possible. The
-remaining inputs (SSH key, cluster settings, node pool settings) are root-level
-variables. Outputs expose the cluster ID, its API endpoints, and the node pool ID.}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[font=\sffamily\footnotesize]
+\node[evalbox, minimum width=3.6cm, minimum height=10.2cm, text width=3.2cm, align=center] (mod) at (0,0)
+  {{\scriptsize\sffamily TERRAFORM MODULE}\\[10pt]{\Large\bfseries\color{ThesisNavy} OKE}};
+
+\node[evalbox, minimum width=4.8cm, minimum height=1.6cm, text width=4.4cm] (in1) at (-6.5,4.4)
+  {\textbf{Network Placement}\\{\scriptsize from \texttt{network}: compartment\_id, vcn\_id, subnet ids}};
+\node[evalbox, minimum width=4.8cm, minimum height=1.6cm, text width=4.4cm] (in2) at (-6.5,2.4)
+  {\textbf{NSG IDs}\\{\scriptsize from \texttt{network}: endpoint / worker / pods}};
+\node[evalbox, minimum width=4.8cm, minimum height=1.6cm, text width=4.4cm] (in3) at (-6.5,0.4)
+  {\textbf{SSH Key}\\{\scriptsize\ttfamily ssh\_public\_key}};
+\node[evalbox, minimum width=4.8cm, minimum height=1.6cm, text width=4.4cm] (in4) at (-6.5,-1.6)
+  {\textbf{Cluster Settings}\\{\scriptsize name, k8s version, public IP}};
+\node[evalbox, minimum width=4.8cm, minimum height=1.6cm, text width=4.4cm] (in5) at (-6.5,-3.6)
+  {\textbf{Node Pool Settings}\\{\scriptsize shape, ocpus, memory, size}};
+
+\node[outputbox, minimum width=4.8cm, minimum height=1.6cm, text width=4.4cm] (out1) at (6.5,2.4)
+  {\textbf{Cluster ID}\\{\scriptsize\ttfamily cluster\_id}};
+\node[outputbox, minimum width=4.8cm, minimum height=1.6cm, text width=4.4cm] (out2) at (6.5,0)
+  {\textbf{Cluster Endpoints}\\{\scriptsize\ttfamily cluster\_endpoints}};
+\node[outputbox, minimum width=4.8cm, minimum height=1.6cm, text width=4.4cm] (out3) at (6.5,-2.4)
+  {\textbf{Node Pool ID}\\{\scriptsize\ttfamily node\_pool\_id}};
+
+\draw[arrow] (in1.east) -- (mod.west |- in1);
+\draw[arrow] (in2.east) -- (mod.west |- in2);
+\draw[arrow] (in3.east) -- (mod.west |- in3);
+\draw[arrow] (in4.east) -- (mod.west |- in4);
+\draw[arrow] (in5.east) -- (mod.west |- in5);
+
+\draw[arrow] (mod.east |- out1) -- (out1.west);
+\draw[arrow] (mod.east |- out2) -- (out2.west);
+\draw[arrow] (mod.east |- out3) -- (out3.west);
+
+\node[note] at (-6.5,5.4) {\textsc{Input}};
+\node[note] at (6.5,3.4) {\textsc{Output}};
+\end{tikzpicture}
+}
+\caption{Terraform \texttt{oke} module inputs and outputs. Network placement and NSG IDs are consumed directly from the \texttt{network} module's outputs; the remaining inputs are root-level variables.}
 \label{fig:oke-module}
 \end{figure}
 
-This input/output discipline is what lets the root module wire \texttt{oke} to
-\texttt{network} with a handful of direct output-to-input references
-(\texttt{vcn\_id}, the subnet IDs, the NSG IDs), without either module reaching into
-the other's internal resources.
-
-\section{Implementation Method: Configuration and Inputs}\label{sec:research-method}
-Table~\ref{tab:variables} lists the inputs the root Terraform module accepts.
+\section{Root Module Configuration}\label{sec:research-method}
+The root Terraform module accepts the variables in Table~\ref{tab:variables}
+(\texttt{variable.tf}).
 
 \begin{table}[H]
 \centering
-\caption{Selected variables declared in \texttt{Terraform-code/variable.tf}.}
+\caption{Root module variables.}
 \label{tab:variables}
 \small
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm} l
@@ -78,18 +125,20 @@ Table~\ref{tab:variables} lists the inputs the root Terraform module accepts.
 \code{node\_shape} & string & OKE worker node compute shape, default \code{VM.Standard.A1.Flex} \\
 \code{node\_ocpus} & number & OCPUs per worker node, default \code{2} \\
 \code{node\_\allowbreak memory\_\allowbreak in\_\allowbreak gbs} & number & Memory per worker node, default \code{16} \\
-\code{node\_count} & number & Worker nodes per availability domain, default \code{2}, floored at \code{2} regardless of input \\
-\code{ssh\_public\_key} & string & SSH public key for optional worker node troubleshooting access \\
-\code{github\_token}, \code{github\_owner}, \code{github\_repo} & string, sensitive & Credentials used to write the OKE cluster OCID back into GitHub Actions secrets \\
+\code{node\_count} & number & Worker nodes per availability domain, default \code{2}, floored at \code{2} in \code{main.tf} regardless of input \\
+\code{ssh\_public\_key} & string & SSH public key for worker node access \\
+\code{ssh\_\allowbreak allowed\_\allowbreak cidr} & string & Declared but not currently read by any resource; SSH ingress is hard-coded to \code{0.0.0.0/0} in \code{modules/network} instead (Section~\ref{sec:sec-network}) \\
+\code{github\_token}, \code{github\_owner}, \code{github\_repo} & string, sensitive & Used by \code{github.tf} to write the OKE cluster's OCID into the \code{Terraform-code} repository's own \code{CLUSTER\_OCID} GitHub secret \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Configuration Framework: Reducing Repetition}\label{sec:analytical-framework}
-The network module's NSG rules are the clearest example of avoiding repetition in this
-configuration. Every ingress and egress rule, for every subnet, is declared once as data
-in \texttt{modules/network/locals.tf}, then flattened into a single map keyed by
-\texttt{"<subnet>-<index>"} so one \code{for\_each} can generate every rule resource:
+\section{Configuration Patterns}\label{sec:analytical-framework}
+Every NSG ingress/egress rule, for every subnet, is declared once as data in
+\texttt{modules/network/locals.tf} (\texttt{ingress\_by\_nsg}, \texttt{egress\_by\_nsg}),
+then flattened into one map keyed by \texttt{"<subnet>-<index>"} so a single
+\texttt{for\_each} generates every \texttt{oci\_core\_network\_security\_group\_\allowbreak
+security\_rule} resource:
 
 \begin{lstlisting}[caption={\texttt{modules/network/locals.tf} -- flattening per-subnet rule lists into one for\_each-able map}]
 ingress_rules_flat = merge([
@@ -100,22 +149,26 @@ ingress_rules_flat = merge([
 ]...)
 \end{lstlisting}
 
-Adding a seventh ingress rule to any subnet means adding one object to the relevant list
-in \texttt{ingress\_by\_nsg}; the resource block that actually creates
-\texttt{oci\_core\_network\_security\_group\_security\_rule} resources never changes.
-The same \texttt{for\_each} pattern is used for the four subnets themselves, each built
-from a typed \texttt{map(object(\{cidr\_block, is\_public\}))} variable rather than four
-separate resource blocks.
+Adding a rule means adding one object to a list in \texttt{ingress\_by\_nsg} or
+\texttt{egress\_by\_nsg}; the resource block itself never changes. The same pattern
+builds the four subnets and their NSGs from typed maps rather than one block per
+subnet.
 
-\section{Change-Safety: Promoting One Service at a Time}\label{sec:evaluation-criteria}
-Because each microservice has its own repository, its own CI pipeline, and its own entry
-in the Helm chart's \texttt{values.yaml}, changing one service's image does not require
-touching Terraform or the other four services. Table~\ref{tab:change-criteria} sets out
-how a change actually reaches the cluster.
+\section{CI/CD Pipeline}\label{sec:evaluation-criteria}
+Each of the five application repositories has its own \texttt{ci.yml} workflow,
+triggered on push to \texttt{main}. All five follow the same template: a
+multi-architecture image build (\texttt{linux/amd64}, \texttt{linux/arm64} via
+Docker Buildx and QEMU), OCIR authentication through a short-lived OCI CLI token,
+and a push tagged with both the GitHub Actions run number and \texttt{latest}.
+The \texttt{arm64} target matches the OKE node pool itself: \texttt{node\_shape}
+defaults to \texttt{VM.Standard.A1.Flex}, an Ampere ARM64 compute shape, so every
+image needs an ARM64 variant to run on the cluster's worker nodes.
+Table~\ref{tab:change-criteria} shows how a code change reaches the running
+cluster.
 
 \begin{table}[H]
 \centering
-\caption{How a code change in one service reaches the running cluster.}
+\caption{CI/CD deployment sequence.}
 \label{tab:change-criteria}
 \small
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.6cm}
@@ -123,52 +176,94 @@ how a change actually reaches the cluster.
 \toprule
 \textbf{Step} & \textbf{What happens} \\
 \midrule
-Push to \texttt{main} in a service repository & That repository's own \texttt{ci.yml} builds the Docker image and pushes it to OCIR, tagged with both the GitHub Actions run number and \texttt{latest} \\
-Reusable \texttt{update-helm.yml} workflow & Checks out \texttt{Terraform-code}, converts the service's dash-case name to the matching \texttt{values.yaml} key, and uses \texttt{yq} to bump only that service's \texttt{image.tag} \\
-Commit and push to \texttt{Terraform-code} & The updated \texttt{values.yaml} is committed back to the Helm chart's repository \\
-ArgoCD reconciliation & ArgoCD's automated sync (prune and self-heal enabled) detects the change and rolls out the new image for that one deployment \\
+Push to \texttt{main} & The service's own \texttt{ci.yml} builds and pushes a multi-arch image to OCIR \\
+Reusable \texttt{update-helm.yml} workflow & Checks out \texttt{Terraform-code}, converts the service's dash-case name to \texttt{values.yaml}'s camelCase key (e.g.\ \texttt{payments-service} $\to$ \texttt{paymentsService}) via \texttt{awk}, and uses \texttt{yq} to bump only that key's \texttt{image.tag} \\
+Commit and push to \texttt{Terraform-code} & The updated \texttt{values.yaml} is committed back with a bot identity (\texttt{GitHub Actions <actions@github.com>}) \\
+ArgoCD reconciliation & ArgoCD's automated sync (\texttt{prune: true}, \texttt{selfHeal: true}) rolls out the new image for that one Deployment \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Because \texttt{update-helm.yml} only ever edits one service's \texttt{image.tag} key,
-promoting \texttt{payments-service} cannot accidentally change what image
-\texttt{auth-service} is running. Figure~\ref{fig:pipeline-flow} shows the same sequence
-as a single left-to-right path.
+Figure~\ref{fig:pipeline-flow} is the team's own diagram of this pipeline, drawn
+across all five repositories: each one builds its image and pushes it to OCIR,
+a shared checkout/update-charts/push job writes the new tag into the Helm chart,
+and ArgoCD watches that chart and updates the cluster. It runs automatically on
+every push and does not provision infrastructure, which is handled separately
+(Section~\ref{sec:bootstrap-pipeline}).
 
 \begin{figure}[H]
 \centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[node distance=14mm]
-\node[outputbox, text width=26mm] (push) {\textbf{Push}\\{\scriptsize to \texttt{main}}};
-\node[evalbox, right=of push, text width=32mm] (ci) {\textbf{ci.yml}\\{\scriptsize build + push image}};
-\node[neutralbox, right=of ci, text width=24mm] (ocir) {\textbf{OCIR}\\{\scriptsize tagged image}};
-\node[evalbox, right=of ocir, text width=34mm] (helm) {\textbf{update-\allowbreak helm.yml}\\{\scriptsize bump \texttt{values.yaml}}};
-\node[outputbox, right=of helm, text width=30mm] (argocd) {\textbf{ArgoCD}\\{\scriptsize sync + self-heal}};
-\draw[arrow] (push) -- (ci);
-\draw[arrow] (ci) -- (ocir);
-\draw[arrow] (ocir) -- (helm);
-\draw[arrow] (helm) -- (argocd);
-\end{tikzpicture}
-}
-\caption{The image-promotion pipeline as one path: a push to a single service's
-repository ends, four steps later, in ArgoCD rolling out only that service's new
-image.}
+\includegraphics[width=\textwidth]{Figures/cicd.png}
+\caption{Image-promotion pipeline, from each service's CI workflow through to the ArgoCD-managed Kubernetes cluster.}
 \label{fig:pipeline-flow}
 \end{figure}
 
-\section{Container Image Build and Health Checks}\label{sec:container-build}
-Every backend service is built from the same two-stage Dockerfile pattern, shown here
-for \texttt{auth-service}:
+\section{Infrastructure Bootstrap Pipeline}\label{sec:bootstrap-pipeline}
+\texttt{Terraform-code/.github/workflows/deploy.yml} provisions the environment from
+a clean account. Triggered manually (\texttt{workflow\_dispatch}) rather than on
+push, it runs, in order: \texttt{terraform apply}; installs the NGINX Ingress
+Controller via Helm; installs cert-manager and a \texttt{letsencrypt-prod}
+\texttt{ClusterIssuer} (HTTP-01, using the \texttt{ADMIN\_EMAIL} secret as the
+ACME registration email) so the ingress's TLS certificate is issued
+automatically; generates a kubeconfig from the new cluster's OCID; creates the
+\texttt{ocir-secret} and \texttt{app-secrets} Kubernetes Secrets from encrypted
+GitHub Actions secrets; installs ArgoCD from its upstream manifest; and applies
+\texttt{argocd/ecommerce-app.yaml} and \texttt{argocd/argocd-ingress.yaml}. This
+one workflow assembles the full stack: infrastructure, ingress controller and
+TLS, secrets, and the GitOps controller. Because Terraform state lives in the
+S3-compatible OCI backend rather than on the runner, re-running the workflow
+updates the existing infrastructure instead of provisioning a duplicate VCN or
+cluster.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{Figures/deployBootstrap.png}
+\caption{Infrastructure bootstrap pipeline: from checkout through Terraform
+provisioning, kubeconfig generation, Helm chart installation, and secret
+configuration.}
+\label{fig:bootstrap-flow}
+\end{figure}
+
+Table~\ref{tab:bootstrap-secrets} lists the GitHub Actions secrets
+\texttt{deploy.yml} reads, grouped by what they configure.
+
+\begin{table}[H]
+\centering
+\caption{GitHub Actions secrets consumed by \texttt{deploy.yml}.}
+\label{tab:bootstrap-secrets}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{5.6cm}
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Secret} & \textbf{Used for} \\
+\midrule
+\code{OCI\_TENANCY\_\allowbreak OCID}, \code{OCI\_USER\_\allowbreak OCID}, \code{OCI\_FINGERPRINT}, \code{OCI\_KEY\_\allowbreak CONTENT} & OCI CLI and Terraform provider authentication \\
+\code{OCI\_COMPARTMENT\_\allowbreak OCID} & Target compartment for every provisioned resource \\
+\code{SSH\_PUBLIC\_\allowbreak KEY} & Injected into the OKE node pool for worker node SSH access \\
+\code{OCI\_S3\_\allowbreak ACCESS\_\allowbreak KEY}, \code{OCI\_S3\_\allowbreak SECRET\_\allowbreak KEY}, \code{OCI\_NAMESPACE} & Terraform's S3-compatible remote state backend \\
+\code{GH\_PAT} & Used by \code{github.tf} to write the cluster OCID back to this repository, and by the reusable \code{update-helm.yml} workflow to commit image-tag bumps \\
+\code{OCI\_OCIR\_\allowbreak USERNAME}, \code{OCI\_AUTH\_\allowbreak TOKEN} & Build the \code{ocir-secret} image-pull Secret \\
+\code{JWT\_SECRET}, \code{STRIPE\_SECRET\_\allowbreak KEY}, \code{ADMIN\_EMAIL}, \code{ADMIN\_PASSWORD} & Build the \code{app-secrets} Kubernetes Secret; \code{ADMIN\_EMAIL} also registers the Let's Encrypt \code{ClusterIssuer} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\clearpage
+\section{Container Images and Health Checks}\label{sec:container-build}
+Every backend service is built from the same two-stage Dockerfile pattern, shown
+here for \texttt{auth-service}. All five images use \texttt{node:20-slim} rather
+than an Alpine base: the OKE node pool runs ARM64, and cross-compiling Alpine
+images for \texttt{arm64} under QEMU produced \texttt{Illegal instruction} crashes
+at runtime, which the Debian-based slim image does not have.
 
 \begin{lstlisting}[language={}, caption={\texttt{auth-service/Dockerfile}}]
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci || npm install
 COPY . .
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --chown=node:node --from=builder /app /app
@@ -181,71 +276,134 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 CMD ["npm", "start"]
 \end{lstlisting}
 
-The builder stage installs dependencies and copies source; the runner stage copies only
-the finished \texttt{/app} directory forward and switches to the non-root \texttt{node}
-user before starting the process, so the container never runs as root. Each service
-exposes its own \texttt{/health} endpoint (a plain 200 response, no dependency checks),
-which both the Docker-level \texttt{HEALTHCHECK} and the Kubernetes liveness and
-readiness probes target.
+\texttt{ecomm-ui} uses a three-stage variant (\texttt{deps}/\texttt{builder}/\texttt{runner})
+that produces a Next.js standalone build, running as a dedicated \texttt{nextjs}
+user (UID 1001) rather than the base image's built-in \texttt{node} user. Both
+Dockerfile families run as non-root and expose a Docker-level
+\texttt{HEALTHCHECK}.
 
-The four backend services (\texttt{auth-service}, \texttt{products-service},
-\texttt{orders-service}, \texttt{payments-service}) use the same probe timing in their
-Kubernetes manifests, set out in Table~\ref{tab:health-probes}.
+Table~\ref{tab:health-probes} lists the Kubernetes liveness/readiness probe timing
+from the Helm chart's templates. The four backend services share identical timing;
+\texttt{ecomm-ui} uses longer, more forgiving timing against \texttt{/} rather than a
+dedicated health endpoint, to give its Next.js server-side rendering enough room to
+finish a cold start on the ARM64 node pool before Kubernetes restarts or
+deregisters the pod.
 
 \begin{table}[H]
 \centering
-\caption{Liveness and readiness probe timing, common to the four backend services.}
+\caption{Container health checks, by workload.}
 \label{tab:health-probes}
 \small
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3cm} X X}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm}
+                >{\raggedright\arraybackslash}X X}
 \toprule
-\textbf{Probe} & \textbf{Initial delay / period / timeout} & \textbf{Failure threshold} \\
+\textbf{Workload} & \textbf{Liveness} & \textbf{Readiness} \\
 \midrule
-Liveness (\texttt{GET /health}) & 15s initial delay, every 10s, 5s timeout & 3 consecutive failures restart the container \\
-Readiness (\texttt{GET /health}) & 5s initial delay, every 5s, 3s timeout & 3 consecutive failures remove the pod from Service routing \\
+Backend services (4) & \texttt{GET /health}: 15s delay, every 10s, 5s timeout, 3 failures & \texttt{GET /health}: 5s delay, every 5s, 3s timeout, 3 failures \\
+\texttt{ecomm-ui} & \texttt{GET /}: 40s delay, every 20s, 15s timeout, 5 failures & \texttt{GET /}: 30s delay, every 15s, 10s timeout, 5 failures \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-The readiness probe's shorter delay and interval mean a pod is pulled out of rotation
-quickly if it stops responding, while the liveness probe's longer thresholds avoid
-restarting a container that is merely slow to start.
+The readiness probe's shorter delay and interval mean a pod is pulled out of
+rotation quickly if it stops responding, while the liveness probe's longer
+thresholds avoid restarting a container that is merely slow to start.
 
-\section{Records as the Source of Truth}\label{sec:data-evidence-weighting}
-Two records anchor this system, at two different layers. Terraform's own state file is
-the source of truth for the infrastructure it manages: the VCN, subnets, NSGs, the OKE
-cluster, and the OCIR repositories. Above that, once the cluster exists, the Helm chart's
-\texttt{values.yaml} inside \texttt{Terraform-code} is the source of truth for
-\emph{which image tag each workload is currently running}, and ArgoCD's own sync status
-is the record of whether the live cluster actually matches that file. This is the core
-GitOps property the pipeline in Section~\ref{sec:evaluation-criteria} relies on: the
-desired state lives in Git, not on any one operator's machine.
+\section{Deployment Guide}\label{sec:deployment-guide}
+The steps below follow \texttt{Terraform-code/DEPLOYMENT.md} and cover the
+one-time setup of a new environment by hand; \texttt{deploy.yml}
+(Section~\ref{sec:bootstrap-pipeline}) automates the same sequence. Once the
+environment exists, ordinary code changes go through the per-push CI/CD path in
+Section~\ref{sec:evaluation-criteria} instead, with no manual step in between.
 
-\section{Assumptions and Limitations}\label{sec:assumptions-limitations}
-Two decisions were left open in the assessment phase and resolved with concrete defaults
-during the Terraform build rather than being specified upfront: the OKE node pool's
-compute shape and OCPU/memory split defaulted to \texttt{VM.Standard.A1.Flex} at 2 OCPUs
-and 16\,GB of memory, and the specific database engine per service was resolved by
-running a single shared MongoDB instance for all five services rather than one database
-per service. We revisit both as open items in Chapter~\ref{chap:concl}. Separately, the
-root module's IAM policy resources (a dynamic group and policy that would let OKE worker
-nodes pull images and read secrets without a static auth token) are present in
-\texttt{main.tf} but commented out, with an inline note that the team did not have
-tenancy-level access to create dynamic groups in this environment; an OCIR auth token
-is used instead.
+\subsection*{Prerequisites}
+Docker 20+, the OCI CLI, Terraform 1.5+, \texttt{kubectl} 1.28+, and Helm 3+,
+installed locally.
+
+\subsection*{Deployment Steps}
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{Authenticate to OCIR} using a short-lived OCI CLI token, or a static
+        OCI Auth Token as a fallback.
+  \item \textbf{Build and push all five images} with the repository's
+        \texttt{scripts/build\_and\_push.sh <REGION> <NAMESPACE> <TAG> <COMPARTMENT>}.
+  \item \textbf{Provision infrastructure:}
+\begin{lstlisting}[style=shellstyle]
+terraform init
+terraform plan
+terraform apply
+\end{lstlisting}
+  \item \textbf{Configure \texttt{kubectl}} via
+        \texttt{oci ce cluster create-kubeconfig}, then apply the namespace:
+\begin{lstlisting}[style=shellstyle]
+kubectl apply -f ./kubernetes/00-namespace.yaml
+\end{lstlisting}
+  \item \textbf{Create the OCIR pull secret and application secrets.} The pull
+        secret is a Kubernetes \texttt{docker-registry} Secret built from an OCI
+        Auth Token; application secrets come from a local, gitignored \texttt{.env}
+        file:
+\begin{lstlisting}[style=shellstyle]
+kubectl create secret docker-registry ocir-secret \
+  --docker-server=jed.ocir.io \
+  --docker-username='<OCIR username>' \
+  --docker-password='<OCI auth token>' \
+  -n ecommerce-ns
+
+kubectl create secret generic app-secrets \
+  --from-env-file=.env -n ecommerce-ns
+\end{lstlisting}
+  \item \textbf{Deploy the application} -- either the Helm chart (the path ArgoCD
+        also reconciles against) or the raw manifests:
+\begin{lstlisting}[style=shellstyle]
+helm install ecommerce ./helm/ecommerce-app -n ecommerce-ns
+% or, applying each raw manifest in numeric order (00 through 06)
+\end{lstlisting}
+  \item \textbf{Register the Application with ArgoCD} by applying
+        \texttt{argocd/ecommerce-app.yaml}, so future pushes flow through the CI/CD
+        pipeline instead of manual commands.
+\end{enumerate}
+
+\section{Configuration Reference}\label{sec:config-reference}
+Table~\ref{tab:config-secrets} lists the environment variables the application
+reads at runtime.
+
+\begin{table}[H]
+\centering
+\caption{Application environment variables.}
+\label{tab:config-secrets}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm}
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Variable} & \textbf{Read by} \\
+\midrule
+\code{MONGODB\_URI} & All four backend services; also referenced by \texttt{ecomm-ui}'s unused \texttt{src/lib/db.ts} helper \\
+\code{JWT\_SECRET} & \texttt{auth-service} (sign) and \texttt{ecomm-ui}'s \texttt{middleware.ts} (verify) \\
+\code{ADMIN\_EMAIL}, \code{ADMIN\_PASSWORD} & \texttt{auth-service}, used only to seed the default admin account when none exists \\
+\code{STRIPE\_\allowbreak SECRET\_\allowbreak KEY} & \texttt{payments-\allowbreak service} \\
+\code{AUTH\_\allowbreak SERVICE\_\allowbreak URL}, \code{PRODUCT\_\allowbreak SERVICE\_\allowbreak URL}, \code{ORDER\_\allowbreak SERVICE\_\allowbreak URL}, \code{PAYMENT\_\allowbreak SERVICE\_\allowbreak URL} & \texttt{ecomm-ui}'s BFF routes, to reach each backend service by its in-cluster Service DNS name \\
+\code{PORT} & Every service; defaults to its own hard-coded port if unset \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The four \texttt{*\_SERVICE\_URL} variables and \texttt{MONGODB\_URI} come from a
+ConfigMap (\texttt{app-config}); the rest come from the \texttt{app-secrets} Secret
+described in Section~\ref{sec:bootstrap-pipeline}.
+
+\section{Testing}\label{sec:testing}
+\begin{infobox}[Testing]
+Automated tests are not currently included in the six repositories.
+\texttt{Terraform-code/.github/workflows/test-runner.yml} contains a placeholder
+runner check but does not execute an application or infrastructure test suite.
+\end{infobox}
 
 \section{Environment Teardown}\label{sec:environment-teardown}
-The deployment runbook (\texttt{Terraform-code/DEPLOYMENT.md}) documents teardown in
-dependency order, uninstalling the application before destroying the infrastructure that
-hosts it:
+\texttt{DEPLOYMENT.md} documents teardown in dependency order, uninstalling the
+application before destroying the infrastructure that hosts it:
 
 \begin{lstlisting}[style=shellstyle, caption={Teardown sequence from DEPLOYMENT.md}]
 helm uninstall ecommerce -n ecommerce-ns
-kubectl delete -f ./Project/Terraform-code/kubernetes/
+kubectl delete -f ./kubernetes/
 
-cd /home/ali_hamad/terraform/Project/Terraform-code
 terraform destroy
 \end{lstlisting}
-
-The application layer (Helm release or raw manifests) is removed first, then the
-underlying OKE cluster and network are destroyed through Terraform.

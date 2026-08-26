@@ -1,61 +1,28 @@
-\chapter{Recommendations and Next Steps}\label{chap:todo}
+\chapter{Troubleshooting}\label{chap:troubleshooting}
 
-\section{Further Testing Needed}\label{sec:further-research}
-Two follow-up exercises would materially reduce the uncertainty named in
-Section~\ref{sec:biggest-uncertainty}:
+Table~\ref{tab:troubleshooting} lists common symptoms, diagnostic commands, and
+likely causes, based on the operational commands in
+\texttt{Terraform-code/DEPLOYMENT.md} and the deployment mechanics in
+Chapter~\ref{chap:Methodology}.
 
-\begin{itemize}[leftmargin=1.4em]
-  \item a live verification pass against the running cluster (\texttt{kubectl get
-        pods}, a request against the public load balancer) to confirm the deployment
-        behaves as the committed configuration describes; and
-  \item a basic load test against the deployed autoscaling thresholds, to see how the
-        uniform 2--5 replica, 75\% CPU policy behaves under realistic traffic for each
-        of the five services.
-\end{itemize}
-
-\section{Data to Validate}\label{sec:data-to-validate}
-The item most likely to change first is the compute sizing and database-engine defaults
-named in Section~\ref{sec:risk-analysis}, since both were explicitly left open rather
-than deliberately chosen. Anyone extending this configuration should re-read
-\texttt{variable.tf} and the Helm chart's \texttt{values.yaml} directly rather than
-trust the defaults quoted in this documentation.
-
-\section{Recommended Actions}\label{sec:recommended-actions}
-\begin{enumerate}[leftmargin=1.4em]
-  \item \textbf{Finalize the node pool sizing.} Revisit \texttt{node\_shape},
-        \texttt{node\_ocpus}, and \texttt{node\_memory\_in\_gbs} against the
-        application's actual observed resource usage rather than the current defaults.
-  \item \textbf{Decide the per-service database question deliberately.} Either confirm
-        the shared MongoDB instance as the intended long-term design, or provision a
-        separate database per service as originally scoped in the assessment phase.
-  \item \textbf{Add an HTTPS listener.} The current ingress is HTTP only; a
-        production-facing version of this build would add a managed certificate.
-\end{enumerate}
-
-\section{Monitoring Indicators}\label{sec:monitoring-indicators}
 \begin{table}[H]
 \centering
-\caption{Indicators worth monitoring as this deployment matures.}
-\label{tab:monitoring-indicators}
+\caption{Common symptoms, diagnostic commands, and likely causes.}
+\label{tab:troubleshooting}
 \small
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X
-                >{\raggedright\arraybackslash}X
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm}
+                >{\raggedright\arraybackslash}p{4.4cm}
                 >{\raggedright\arraybackslash}X}
 \toprule
-\textbf{Indicator} & \textbf{Why It Matters} & \textbf{Review Frequency} \\
+\textbf{Symptom} & \textbf{Diagnostic command} & \textbf{Likely cause} \\
 \midrule
-Per-service HPA CPU/memory utilization vs.\ the 75\%/80\% thresholds & Signals whether the uniform autoscaling policy fits each service's actual traffic shape & After any load test \\
-ArgoCD sync status for \texttt{ecommerce-app} & Confirms the running cluster still matches the Helm chart in \texttt{Terraform-code} & Continuous, via ArgoCD's own dashboard \\
-MongoDB PVC utilization (10Gi, shared) & Signals when the single shared database instance is approaching a capacity or contention limit & Monthly, or after any product-catalog seeding \\
+A pod is stuck in \code{CrashLoop\allowbreak BackOff} & \code{kubectl logs <pod> -n ecommerce-ns --previous} & Missing or misconfigured secret (Table~\ref{tab:config-secrets}), or the service cannot reach MongoDB \\
+A pod never becomes \code{Ready} & \code{kubectl describe pod <pod> -n ecommerce-ns} & Failing readiness probe against \code{/health}; check the probe timing in Table~\ref{tab:health-probes} \\
+A new image never rolls out after a push & Check the run status of \code{ci.yml} and \code{update-helm.yml} in the service's repository, then \code{git log -p values.yaml} in \texttt{Terraform-code} & The reusable \texttt{update-helm.yml} workflow failed to bump the tag, or ArgoCD has not yet synced \\
+ArgoCD shows \code{OutOfSync} & \code{argocd app get ecommerce-app} & \texttt{selfHeal} will revert any manual \texttt{kubectl edit}; the fix is always a Git commit to \texttt{Terraform-code}, never a live edit \\
+A request to a backend path returns 502/504 & \code{kubectl get endpoints -n ecommerce-ns} and re-check Table~\ref{tab:ingress-routing} & The target Service has no Ready pods behind it, or the ingress path/port does not match the Service definition \\
+Deployment stuck after \code{terraform apply} & \code{terraform plan} again, then \code{oci ce cluster create-kubeconfig} to refresh local cluster access & Stale local \texttt{kubeconfig}, or a resource still reconciling in OCI \\
+An order shows \code{paid} that was never actually paid & \code{kubectl logs -n ecommerce-ns -l app=payments-\allowbreak service --tail=50} and check the Stripe dashboard for a matching session & Consistent with Section~\ref{sec:sec-payments}: \code{/api/orders/confirm} does not verify the Stripe session, so any call with a valid \code{orderId} succeeds \\
 \bottomrule
 \end{tabularx}
 \end{table}
-
-\section{Open Questions}\label{sec:open-questions}
-\begin{itemize}[leftmargin=1.4em]
-  \item whether the shared MongoDB instance should be split into one database per
-        service before this architecture is reused beyond the internship context; and
-  \item whether the OKE IAM dynamic group policy, currently commented out in
-        \texttt{main.tf} for lack of tenancy access, should be revisited once broader
-        access is available.
-\end{itemize}

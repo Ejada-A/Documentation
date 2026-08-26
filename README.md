@@ -7,12 +7,12 @@ ArgoCD pipeline.
 
 ## Contents
 
-- **[`final_project_documentation/`](final_project_documentation/)** — the
+- **[`final_project_documentation/`](final_project_documentation/)**: the
   LaTeX documentation project itself (source, figures, and the compiled PDF).
   See **[its README](final_project_documentation/README.md)** for the full
   breakdown: repository structure, how to build the PDF, chapter contents,
   the team, and links to the related service repositories.
-- **`Arch_and_Design_Draft.pdf`** — the original architecture and design
+- **`Arch_and_Design_Draft.pdf`**: the original architecture and design
   draft written during the assessment phase, before implementation began.
 
 ## Quick start
