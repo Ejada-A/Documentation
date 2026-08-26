@@ -1,0 +1,46 @@
+\chapter*{Summary}
+%\addcontentsline{toc}{chapter}{Summary}
+\label{chap:abstract}
+\pagestyle{plain}
+
+For the final week of the Ejada Cloud Build Track internship, Group A took an
+e-commerce application and modernized it into a microservice architecture deployed on
+Oracle Kubernetes Engine (OKE), reusing and extending the Terraform module structure
+built in earlier weeks. This documentation covers both halves of that deliverable: the
+assessment that turned one application description into four independent
+microservices, and the Terraform, Helm, and GitOps mechanics used to build, deploy, and
+continuously update them on OKE.
+
+We split the application into four domains, each owning a distinct slice of the data
+model: \textbf{Auth} (accounts, credentials, roles), \textbf{Product} (catalog),
+\textbf{Cart/Orders}, and \textbf{Purchase/Payments}. Each domain became its own
+microservice and its own Git repository, matching a 1:1 mapping with no merging at the
+service level. The network that hosts them follows the same defense-in-depth shape used
+in previous weeks: four subnets (API endpoint, load balancer, worker nodes, pods), with
+only the load balancer subnet public-facing, Internet/NAT/Service gateways routed per
+tier, and per-resource Network Security Groups generated from a single reusable
+Terraform pattern rather than hand-written per subnet.
+
+Three architectural points stand out in this build:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Domain boundaries were decided by data ownership, not by who is allowed
+        to act on the data.} Admin CRUD on the product catalog was folded into the
+        Product service rather than split into its own service, because the Product
+        service already owns that data.
+  \item \textbf{The infrastructure is fully GitOps-driven.} Each microservice's own CI
+        pipeline builds and pushes its container image to OCIR, then triggers a shared
+        workflow that bumps that service's image tag in the Helm chart's
+        \texttt{values.yaml}; ArgoCD watches that same file and reconciles the cluster
+        automatically, with no manual \texttt{kubectl apply} step in the normal flow.
+  \item \textbf{The Terraform network module generalizes the pattern used in earlier
+        weeks.} Subnets, and their ingress/egress rules, are generated from
+        \texttt{for\_each} over typed maps and flattened rule lists rather than
+        hand-written per subnet, so adding a fifth subnet or a new rule is a data change,
+        not a new resource block.
+\end{itemize}
+
+The compute sizing (node shape, OCPU/memory split) and the database engine per service
+were left as open implementation decisions in the assessment phase and defaulted to
+concrete values during the Terraform build, which we note explicitly in
+Chapter~\ref{chap:concl} rather than presenting as settled from the outset.

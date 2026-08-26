@@ -1,0 +1,17 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.toc
+*.lof
+*.lot
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+
+# AI-agent authoring workflow (internal tooling, not part of the documentation itself)
+prompts/
+agent-transfer-instructions.txt
+figure-style-conversion-prompt.txt

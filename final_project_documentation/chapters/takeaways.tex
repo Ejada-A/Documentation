@@ -1,0 +1,52 @@
+\chapter{Conclusions}\label{chap:concl}
+
+\section{Main Conclusion}\label{sec:main-conclusion}
+The system we built implements the four-domain microservice split identified in the
+assessment phase as a 1:1 mapping to five Git repositories (four backend services plus
+the frontend), deployed to OKE through a fully GitOps-driven pipeline: each service's
+own CI builds and pushes its image, a shared workflow promotes that image's tag into the
+Helm chart, and ArgoCD reconciles the cluster automatically from that chart. That
+answers the objective set out in Section~\ref{sec:core-question} directly: the
+data-ownership analysis from the assessment phase is traceable, service by service, into
+the repositories and deployment configuration described in Chapter~\ref{chap:results}.
+
+\section{Strongest Supporting Evidence}\label{sec:strongest-evidence}
+Three pieces of evidence carry the most weight for this conclusion:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{The domain-ownership table matches the repository split exactly.} Each
+        domain in Table~\ref{tab:domain-ownership} corresponds to exactly one service
+        repository and one OCIR image, with no domain spread across two repositories.
+  \item \textbf{The Terraform network module generalizes cleanly.} The same
+        \texttt{for\_each}-over-flattened-rules pattern used for four subnets in earlier
+        weeks was reused here without modification to the resource blocks themselves.
+  \item \textbf{The GitOps pipeline is fully wired, end to end, in committed
+        configuration.} Every step from a code push to a cluster reconciliation, in
+        Section~\ref{sec:evaluation-criteria}, is defined in a workflow or manifest file
+        we read directly, not asserted from memory.
+\end{itemize}
+
+\section{Biggest Uncertainty}\label{sec:biggest-uncertainty}
+The largest open item is that two implementation decisions, the OKE node pool's compute
+sizing and the database engine per service, were left unspecified during the assessment
+phase and resolved with a working default during the build rather than a deliberate
+choice made upfront. Reducing that uncertainty means deliberately revisiting both
+defaults against the application's actual resource usage, rather than leaving them at
+whatever the Terraform and Helm defaults happened to be.
+
+\section{Strategic Implications and Recommendation}\label{sec:strategic-implications}
+The current architecture is appropriate as a working implementation of the assessment
+phase's domain boundaries. Before treating the compute sizing and shared-database
+decisions as final, we would revisit both deliberately, each already a one-line change
+in the existing configuration rather than a restructuring: the node shape and
+OCPU/memory split are Terraform variables, and the database choice is a matter of
+provisioning a separate database per service and repointing the relevant
+\texttt{MONGODB\_URI} value.
+
+\section{Confidence Level and Final Judgement}\label{sec:confidence-final-judgement}
+Our confidence in the architecture and deployment-pipeline description in
+Chapter~\ref{chap:results} is \textbf{high}: every claim traces back to a specific file
+in a specific repository under the \texttt{Ejada-A} GitHub organization. Our confidence
+in how the system behaves once actually running is \textbf{lower}, since this
+documentation was compiled from the repositories themselves rather than from a live
+session against the deployed cluster, as noted in Section~\ref{sec:quant-comparative-scenario}.

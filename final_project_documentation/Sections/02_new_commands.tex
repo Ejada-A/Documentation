@@ -1,0 +1,114 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Define new commands related to the file:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\setlength{\parindent}{12pt} %determine font size
+\renewcommand{\baselinestretch}{1.1} %determine spacing between lines
+\raggedbottom
+
+% Give the line-breaker much more room before it accepts an overfull line.
+% This document mixes justified prose with many inline \texttt/\code spans
+% (identifiers, paths), which are poor at absorbing interword stretch; a
+% generous emergency stretch lets TeX quietly loosen such lines instead of
+% letting them bleed into the margin.
+\tolerance=9999
+\emergencystretch=3em
+\hbadness=10000
+
+% Commands related to eps and their usage:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\specialcell}[2][c]{%
+  \begin{tabular}[#1]{@{}c@{}}#2\end{tabular}}
+  
+\newcommand{\includefigWSC}[5]{
+    \begin{figure}[ht]
+     \centering
+      \includegraphics[width=#1\textwidth]{images/#2}
+      \caption[#3]{#4}
+      \label{#5}
+    \end{figure}
+}
+
+\newcommand{\includeeps}[4]{
+\includefig{#1}{#2.eps}{#3}{#4}
+}
+
+\newcommand{\includeepsWSC}[5]{
+\includefigWSC{#1}{#2.eps}{#3}{#4}{#5}
+}
+
+% ---------------------------------------------------------------------------
+% Unified academic systems-diagram palette (shared by every TikZ figure)
+% ---------------------------------------------------------------------------
+\definecolor{ThesisNavy}{HTML}{17324D}
+\definecolor{ThesisBlue}{HTML}{2F6F9F}
+\definecolor{ThesisLightBlue}{HTML}{EAF3F8}
+\definecolor{ThesisGrey}{HTML}{8A8F98}
+\definecolor{ThesisLightGrey}{HTML}{F2F4F6}
+\definecolor{ThesisText}{HTML}{1F2933}
+\definecolor{ArchPurple}{HTML}{6D5A8D}
+\definecolor{ArchPurpleLight}{HTML}{F1EEF6}
+\definecolor{AccentGreen}{HTML}{5B8C6A}
+\definecolor{AccentRed}{HTML}{A35D5D}
+
+\tikzset{
+  font=\sffamily\footnotesize,
+  layerlabel/.style={font=\sffamily\scriptsize\bfseries, text=ThesisNavy, anchor=east},
+  group/.style={rectangle, draw=ThesisBlue, line width=0.55pt, fill=white, inner xsep=5pt, inner ysep=5pt},
+  neutralgroup/.style={rectangle, draw=ThesisGrey, line width=0.55pt, fill=white, inner xsep=5pt, inner ysep=5pt},
+  futuregroup/.style={rectangle, draw=ArchPurple, line width=0.55pt, dashed, fill=white, inner xsep=5pt, inner ysep=5pt},
+  title/.style={font=\sffamily\bfseries\footnotesize, text=ThesisNavy, align=center},
+  box/.style={rectangle, draw=ThesisGrey, line width=0.70pt, fill=white, align=center, inner xsep=5pt, inner ysep=3.2pt, minimum height=10.8mm, text=ThesisText, font=\sffamily\footnotesize},
+  evalbox/.style={box, draw=ThesisBlue},
+  specbox/.style={box, draw=ArchPurple, dashed},
+  neutralbox/.style={box, draw=ThesisGrey, fill=ThesisLightGrey},
+  outputbox/.style={box, draw=ThesisNavy, line width=0.75pt},
+  branchtitle/.style={box, draw=ThesisBlue, font=\sffamily\bfseries\footnotesize, text=ThesisNavy, minimum height=10mm},
+  codebox/.style={rectangle, draw=ThesisGrey, semithick, rounded corners=1pt, align=left, inner sep=5pt, font=\scriptsize\ttfamily, text=ThesisText, fill=ThesisLightGrey},
+  arrow/.style={-{Stealth[length=4.5pt,width=4pt]}, line width=0.65pt, color=ThesisNavy},
+  bluearrow/.style={-{Stealth[length=4.5pt,width=4pt]}, line width=0.65pt, color=ThesisBlue},
+  flowline/.style={line width=0.65pt, color=ThesisNavy},
+  separator/.style={dashed, line width=0.45pt, color=ThesisGrey},
+  note/.style={font=\sffamily\scriptsize, text=ThesisText, align=center}
+}
+
+% ---------------------------------------------------------------------------
+% Unified code-listing style for Terraform/HCL and shell snippets
+% ---------------------------------------------------------------------------
+\lstdefinelanguage{hcl}{
+  morekeywords={resource,data,variable,output,locals,module,provider,terraform,dynamic,for_each,count,lifecycle,content,required_providers,required_version,backend,moved,from,to,ignore_changes,prevent_destroy},
+  sensitive=true,
+  morecomment=[l]{\#},
+  morestring=[b]",
+}
+\lstdefinestyle{hclstyle}{
+  language=hcl,
+  backgroundcolor=\color{ThesisLightGrey},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{ThesisNavy}\bfseries,
+  commentstyle=\color{ThesisGrey}\itshape,
+  stringstyle=\color{ThesisBlue},
+  numbers=left,
+  numberstyle=\tiny\color{ThesisGrey},
+  numbersep=6pt,
+  frame=single,
+  rulecolor=\color{ThesisGrey!60},
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  tabsize=2,
+  xleftmargin=1em,
+  framexleftmargin=1em,
+}
+\lstdefinestyle{shellstyle}{
+  backgroundcolor=\color{ThesisNavy},
+  basicstyle=\ttfamily\footnotesize\color{white},
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{ThesisGrey!60},
+  xleftmargin=1em,
+  framexleftmargin=1em,
+  showstringspaces=false,
+}
+\lstset{style=hclstyle}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\shellcmd}[1]{\texttt{\color{ThesisBlue}#1}}

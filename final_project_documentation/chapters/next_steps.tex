@@ -1,0 +1,61 @@
+\chapter{Recommendations and Next Steps}\label{chap:todo}
+
+\section{Further Testing Needed}\label{sec:further-research}
+Two follow-up exercises would materially reduce the uncertainty named in
+Section~\ref{sec:biggest-uncertainty}:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item a live verification pass against the running cluster (\texttt{kubectl get
+        pods}, a request against the public load balancer) to confirm the deployment
+        behaves as the committed configuration describes; and
+  \item a basic load test against the deployed autoscaling thresholds, to see how the
+        uniform 2--5 replica, 75\% CPU policy behaves under realistic traffic for each
+        of the five services.
+\end{itemize}
+
+\section{Data to Validate}\label{sec:data-to-validate}
+The item most likely to change first is the compute sizing and database-engine defaults
+named in Section~\ref{sec:risk-analysis}, since both were explicitly left open rather
+than deliberately chosen. Anyone extending this configuration should re-read
+\texttt{variable.tf} and the Helm chart's \texttt{values.yaml} directly rather than
+trust the defaults quoted in this documentation.
+
+\section{Recommended Actions}\label{sec:recommended-actions}
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{Finalize the node pool sizing.} Revisit \texttt{node\_shape},
+        \texttt{node\_ocpus}, and \texttt{node\_memory\_in\_gbs} against the
+        application's actual observed resource usage rather than the current defaults.
+  \item \textbf{Decide the per-service database question deliberately.} Either confirm
+        the shared MongoDB instance as the intended long-term design, or provision a
+        separate database per service as originally scoped in the assessment phase.
+  \item \textbf{Add an HTTPS listener.} The current ingress is HTTP only; a
+        production-facing version of this build would add a managed certificate.
+\end{enumerate}
+
+\section{Monitoring Indicators}\label{sec:monitoring-indicators}
+\begin{table}[H]
+\centering
+\caption{Indicators worth monitoring as this deployment matures.}
+\label{tab:monitoring-indicators}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Indicator} & \textbf{Why It Matters} & \textbf{Review Frequency} \\
+\midrule
+Per-service HPA CPU/memory utilization vs.\ the 75\%/80\% thresholds & Signals whether the uniform autoscaling policy fits each service's actual traffic shape & After any load test \\
+ArgoCD sync status for \texttt{ecommerce-app} & Confirms the running cluster still matches the Helm chart in \texttt{Terraform-code} & Continuous, via ArgoCD's own dashboard \\
+MongoDB PVC utilization (10Gi, shared) & Signals when the single shared database instance is approaching a capacity or contention limit & Monthly, or after any product-catalog seeding \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Open Questions}\label{sec:open-questions}
+\begin{itemize}[leftmargin=1.4em]
+  \item whether the shared MongoDB instance should be split into one database per
+        service before this architecture is reused beyond the internship context; and
+  \item whether the OKE IAM dynamic group policy, currently commented out in
+        \texttt{main.tf} for lack of tenancy access, should be revisited once broader
+        access is available.
+\end{itemize}

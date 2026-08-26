@@ -1,0 +1,563 @@
+% Reusable table and figure templates extracted from the AAIB research report.
+% Copy this file into a new LaTeX research repo and adapt the placeholders.
+% Requires: float, array, tabularx, longtable, booktabs, tikz, pgfplots, xcolor, patterns.
+
+% ---------------------------------------------------------------------------
+% Required palette and package assumptions
+% ---------------------------------------------------------------------------
+% \usepackage{float}
+% \usepackage{array}
+% \usepackage{tabularx}
+% \usepackage{longtable}
+% \usepackage{booktabs}
+% \usepackage{tikz}
+% \usetikzlibrary{patterns}
+% \usepackage{pgfplots}
+% \pgfplotsset{compat=1.18}
+% \usepackage{xcolor}
+%
+% \definecolor{aaibblue}{RGB}{0,71,131}
+% \definecolor{aaibgold}{RGB}{185,150,60}
+% \definecolor{aaibgray}{RGB}{120,120,120}
+% \definecolor{aaibred}{RGB}{180,40,40}
+% \definecolor{aaibgreen}{RGB}{34,120,60}
+% \definecolor{aaiblightblue}{RGB}{100,160,210}
+
+% ---------------------------------------------------------------------------
+% Table template 1: three-column stakeholder / summary table
+% ---------------------------------------------------------------------------
+\begin{table}[H]
+\centering
+\caption{<Descriptive Table Caption>}
+\label{tab:<short-label>}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{<Column 1>} & \textbf{<Column 2>} & \textbf{<Column 3>} \\
+\midrule
+<Row label> & <Short description> & <Primary interpretation or implication> \\
+<Row label> & <Short description> & <Primary interpretation or implication> \\
+<Row label> & <Short description> & <Primary interpretation or implication> \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ---------------------------------------------------------------------------
+% Table template 2: four-column risk / criteria / monitoring table
+% ---------------------------------------------------------------------------
+\begin{table}[H]
+\centering
+\caption{<Descriptive Table Caption>}
+\label{tab:<short-label>}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X
+                l
+                >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{<Factor>} & \textbf{<Rating>} & \textbf{<Evidence or Threshold>} & \textbf{<Mitigant or Implication>} \\
+\midrule
+<Factor name> & <High/Medium/Low> & <Metric, basis, or threshold> & <Implication> \\
+<Factor name> & <High/Medium/Low> & <Metric, basis, or threshold> & <Implication> \\
+<Factor name> & <High/Medium/Low> & <Metric, basis, or threshold> & <Implication> \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ---------------------------------------------------------------------------
+% Table template 3: ranked market / peer comparison table
+% ---------------------------------------------------------------------------
+\begin{table}[H]
+\centering
+\caption{<Descriptive Table Caption>}
+\label{tab:<short-label>}
+\small
+\begin{tabularx}{\textwidth}{c >{\raggedright\arraybackslash}X r >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Rank} & \textbf{Entity} & \textbf{Metric} & \textbf{Type or Note} \\
+\midrule
+1 & <Entity name> & <Value> & <Classification or note> \\
+2 & <Entity name> & <Value> & <Classification or note> \\
+3 & \textbf{<Focal entity>} & \textbf{<Value>} & \textbf{<Classification or note>} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% Source: <Source name, date>.
+
+% ---------------------------------------------------------------------------
+% Table template 4: compact numeric comparison table
+% ---------------------------------------------------------------------------
+\begin{table}[H]
+\centering
+\caption{<Descriptive Table Caption>}
+\label{tab:<short-label>}
+\small
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Metric} & \textbf{<Period 1>} & \textbf{<Period 2>} & \textbf{Change} \\
+\midrule
+<Metric name> & <Value> & <Value> & <Change> \\
+<Metric name> & <Value> & <Value> & <Change> \\
+<Metric name> & <Value> & <Value> & <Change> \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------------
+% Table template 5: wide digital / capability comparison table
+% ---------------------------------------------------------------------------
+\begin{table}[H]
+\centering
+\caption{<Descriptive Table Caption>}
+\label{tab:<short-label>}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Dimension} & \textbf{<Entity A>} & \textbf{<Entity B>} & \textbf{<Entity C>} \\
+\midrule
+<Dimension> & <Assessment or metric> & <Assessment or metric> & <Assessment or metric> \\
+<Dimension> & <Assessment or metric> & <Assessment or metric> & <Assessment or metric> \\
+<Dimension> & <Assessment or metric> & <Assessment or metric> & <Assessment or metric> \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% Source: <Source list>.
+
+% ---------------------------------------------------------------------------
+% Table template 6: five-column landscape / ecosystem table
+% ---------------------------------------------------------------------------
+\begin{table}[H]
+\centering
+\caption{<Descriptive Table Caption>}
+\label{tab:<short-label>}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}X l l >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Entity} & \textbf{Model} & \textbf{Funding or Size} & \textbf{Scale} & \textbf{Strategic Overlap} \\
+\midrule
+<Entity> & <Business model> & <Value> & <Users/assets/reach> & <Overlap or implication> \\
+<Entity> & <Business model> & <Value> & <Users/assets/reach> & <Overlap or implication> \\
+<Entity> & <Business model> & <Value> & <Users/assets/reach> & <Overlap or implication> \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ---------------------------------------------------------------------------
+% Longtable template 1: appendix financial highlights
+% ---------------------------------------------------------------------------
+{
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{0.26\linewidth}
+  >{\raggedright\arraybackslash}p{0.11\linewidth}
+  >{\raggedright\arraybackslash}p{0.11\linewidth}
+  >{\raggedright\arraybackslash}p{0.11\linewidth}
+  >{\raggedright\arraybackslash}p{0.11\linewidth}@{}}
+\caption{<Appendix Table Caption>} \label{tab:<short-label>} \\
+\toprule\noalign{}
+Metric & <Year 1> & <Year 2> & <Year 3> & <Year 4> \\
+\midrule\noalign{}
+\endfirsthead
+\caption[]{<Appendix Table Caption>, continued} \\
+\toprule\noalign{}
+Metric & <Year 1> & <Year 2> & <Year 3> & <Year 4> \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+<Metric name> & <Value> & <Value> & <Value> & <Value> \\
+<Metric name> & <Value> & <Value> & <Value> & <Value> \\
+<Metric name> & <Value> & <Value> & <Value> & <Value> \\
+\end{longtable}
+\normalsize
+}
+
+% ---------------------------------------------------------------------------
+% Longtable template 2: appendix timeline table
+% ---------------------------------------------------------------------------
+{
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{0.15\linewidth}
+  >{\raggedright\arraybackslash}p{0.79\linewidth}@{}}
+\caption{<Timeline Caption>} \label{tab:<short-label>} \\
+\toprule\noalign{}
+Year & Milestone \\
+\midrule\noalign{}
+\endfirsthead
+\caption[]{<Timeline Caption>, continued} \\
+\toprule\noalign{}
+Year & Milestone \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+<Year> & <Milestone description> \\
+<Year> & <Milestone description> \\
+<Year> & <Milestone description> \\
+\end{longtable}
+\normalsize
+}
+
+% ---------------------------------------------------------------------------
+% Figure template 1: line chart with shaded area
+% ---------------------------------------------------------------------------
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.85\textwidth,
+      height=6cm,
+      ylabel={<Y-axis label>},
+      xmin=<xmin>, xmax=<xmax>,
+      ymin=0, ymax=<ymax>,
+      xtick={<x ticks>},
+      ytick={<y ticks>},
+      ymajorgrids=true,
+      grid style={gray!20, dashed},
+      axis x line=bottom,
+      axis y line=left,
+      tick align=outside,
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+      clip=false,
+    ]
+    \addplot[
+      fill=aaibblue!15,
+      draw=none,
+    ] coordinates {
+      (<x1>, <y1>)
+      (<x2>, <y2>)
+      (<x3>, <y3>)
+      (<x3>, 0)
+      (<x1>, 0)
+    } \closedcycle;
+
+    \addplot[
+      color=aaibblue,
+      line width=1.8pt,
+      mark=square*,
+      mark size=3pt,
+      mark options={fill=aaibblue},
+    ] coordinates {
+      (<x1>, <y1>)
+      (<x2>, <y2>)
+      (<x3>, <y3>)
+    };
+
+    \node[font=\footnotesize, text=aaibblue, above left] at (axis cs:<x1>,<y1>) {<label>};
+    \node[font=\footnotesize, text=aaibblue, above right] at (axis cs:<x3>,<y3>) {<label>};
+    \end{axis}
+  \end{tikzpicture}
+  \vspace{4pt}
+  \caption{<Chart title, period (unit). Analytical takeaway sentence. Source: source name.>}
+  \label{fig:<short-label>}
+\end{figure}
+
+% ---------------------------------------------------------------------------
+% Figure template 2: vertical bar chart
+% ---------------------------------------------------------------------------
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.78\textwidth,
+      height=6.5cm,
+      ybar,
+      bar width=22pt,
+      ylabel={<Y-axis label>},
+      symbolic x coords={<A>,<B>,<C>,<D>},
+      xtick=data,
+      ymin=0, ymax=<ymax>,
+      ytick={<y ticks>},
+      ymajorgrids=true,
+      grid style={gray!20, dashed},
+      axis x line=bottom,
+      axis y line=left,
+      tick align=outside,
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+      nodes near coords,
+      nodes near coords style={font=\footnotesize, color=aaibblue, anchor=south},
+      every node near coord/.append style={yshift=2pt},
+      enlarge x limits=0.2,
+      clip=false,
+    ]
+    \addplot[fill=aaibblue, draw=aaibblue!80!black] coordinates {
+      (<A>, <value>)
+      (<B>, <value>)
+      (<C>, <value>)
+      (<D>, <value>)
+    };
+    \end{axis}
+  \end{tikzpicture}
+  \vspace{4pt}
+  \caption{<Chart title, period (unit). Analytical takeaway sentence. Source: source name.>}
+  \label{fig:<short-label>}
+\end{figure}
+
+% ---------------------------------------------------------------------------
+% Figure template 3: grouped vertical bar chart, two periods
+% ---------------------------------------------------------------------------
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.82\textwidth,
+      height=6.5cm,
+      ybar=4pt,
+      bar width=16pt,
+      ylabel={<Y-axis label>},
+      symbolic x coords={<Category 1>,<Category 2>,<Category 3>},
+      xtick=data,
+      xticklabel style={font=\footnotesize},
+      ymin=0, ymax=<ymax>,
+      ytick={<y ticks>},
+      ymajorgrids=true,
+      grid style={gray!20, dashed},
+      axis x line=bottom,
+      axis y line=left,
+      tick align=outside,
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+      legend style={at={(0.5,-0.18)},anchor=north,legend columns=2,font=\footnotesize},
+      nodes near coords,
+      nodes near coords style={font=\footnotesize, anchor=south},
+      every node near coord/.append style={yshift=2pt},
+      enlarge x limits=0.25,
+      clip=false,
+    ]
+    \addplot[fill=aaiblightblue!60, draw=aaiblightblue!80!black] coordinates {
+      (<Category 1>, <value>)
+      (<Category 2>, <value>)
+      (<Category 3>, <value>)
+    };
+    \addlegendentry{<Period 1>}
+
+    \addplot[fill=aaibblue, draw=aaibblue!80!black] coordinates {
+      (<Category 1>, <value>)
+      (<Category 2>, <value>)
+      (<Category 3>, <value>)
+    };
+    \addlegendentry{<Period 2>}
+    \end{axis}
+  \end{tikzpicture}
+  \vspace{4pt}
+  \caption{<Chart title, periods (unit). Analytical takeaway sentence. Source: source name.>}
+  \label{fig:<short-label>}
+\end{figure}
+
+% ---------------------------------------------------------------------------
+% Figure template 4: line chart with threshold
+% ---------------------------------------------------------------------------
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.85\textwidth,
+      height=6cm,
+      ylabel={<Y-axis label>},
+      xmin=<xmin>, xmax=<xmax>,
+      ymin=0, ymax=<ymax>,
+      xtick={<x ticks>},
+      ytick={<y ticks>},
+      ymajorgrids=true,
+      grid style={gray!20, dashed},
+      axis x line=bottom,
+      axis y line=left,
+      tick align=outside,
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+      legend style={at={(0.97,0.97)},anchor=north east,legend columns=1,font=\footnotesize,fill=white,draw=gray!40},
+      clip=false,
+    ]
+    \addplot[
+      color=aaibblue,
+      line width=1.8pt,
+      mark=*,
+      mark size=3pt,
+      mark options={fill=aaibblue},
+    ] coordinates {
+      (<x1>, <y1>)
+      (<x2>, <y2>)
+      (<x3>, <y3>)
+    };
+    \addlegendentry{<Main metric>}
+
+    \addplot[
+      color=aaibred,
+      line width=1pt,
+      dashed,
+      domain=<xmin>:<xmax>,
+    ] {<threshold>};
+    \addlegendentry{<Threshold label>}
+
+    \node[font=\footnotesize, text=aaibblue, above right] at (axis cs:<x1>,<y1>) {<label>};
+    \node[font=\footnotesize, text=aaibblue, above right] at (axis cs:<x3>,<y3>) {<label>};
+    \end{axis}
+  \end{tikzpicture}
+  \vspace{4pt}
+  \caption{<Chart title, period. Analytical takeaway sentence. Source: source name.>}
+  \label{fig:<short-label>}
+\end{figure}
+
+% ---------------------------------------------------------------------------
+% Figure template 5: horizontal peer-ranking bar chart with focal highlight
+% ---------------------------------------------------------------------------
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.85\textwidth,
+      height=5.8cm,
+      xbar=0pt,
+      bar width=15pt,
+      xlabel={<X-axis label>},
+      ylabel={},
+      symbolic y coords={<Focal>,<Peer 1>,<Peer 2>,<Peer 3>,<Peer 4>},
+      ytick={<Focal>,<Peer 1>,<Peer 2>,<Peer 3>,<Peer 4>},
+      xmin=<xmin>, xmax=<xmax>,
+      xtick={<x ticks>},
+      xmajorgrids=true,
+      grid style={gray!20, dashed},
+      axis x line=bottom,
+      axis y line=left,
+      tick align=outside,
+      tick label style={font=\footnotesize},
+      y tick label style={font=\footnotesize},
+      label style={font=\small},
+      nodes near coords,
+      nodes near coords style={font=\footnotesize, anchor=west},
+      nodes near coords align={horizontal},
+      point meta=explicit symbolic,
+      enlarge y limits=0.18,
+      clip=false,
+    ]
+    \addplot[fill=aaiblightblue!55, draw=aaiblightblue!80!black, bar shift=0pt] coordinates {
+      (<value>,<Peer 1>) [{<label>}]
+      (<value>,<Peer 2>) [{<label>}]
+      (<value>,<Peer 3>) [{<label>}]
+      (<value>,<Peer 4>) [{<label>}]
+    };
+
+    \addplot[fill=aaibblue, draw=aaibblue!80!black, bar shift=0pt] coordinates {
+      (<value>,<Focal>) [{<label>}]
+    };
+    \end{axis}
+  \end{tikzpicture}
+  \vspace{4pt}
+  \caption{<Chart title, period (unit). Analytical takeaway sentence. Source: source name.>}
+  \label{fig:<short-label>}
+\end{figure}
+
+% ---------------------------------------------------------------------------
+% Figure template 6: horizontal actual-vs-minimum bar chart
+% ---------------------------------------------------------------------------
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.85\textwidth,
+      height=5.5cm,
+      xbar=3pt,
+      bar width=13pt,
+      xlabel={<X-axis label>},
+      ylabel={},
+      symbolic y coords={<Metric 3>,<Metric 2>,<Metric 1>},
+      ytick=data,
+      y tick label style={font=\footnotesize},
+      xmin=0, xmax=<xmax>,
+      xtick={<x ticks>},
+      xmajorgrids=true,
+      grid style={gray!20, dashed},
+      axis x line=bottom,
+      axis y line=left,
+      tick align=outside,
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+      legend style={at={(0.5,-0.32)},anchor=north,legend columns=2,font=\footnotesize},
+      nodes near coords,
+      nodes near coords style={font=\footnotesize, anchor=west},
+      nodes near coords align={horizontal},
+      point meta=explicit symbolic,
+      enlarge y limits=0.25,
+      clip=false,
+    ]
+    \addplot[
+      fill=aaibred!30,
+      draw=aaibred,
+      pattern=north east lines,
+      pattern color=aaibred,
+    ] coordinates {
+      (<minimum>,<Metric 1>) [{<label>}]
+      (<minimum>,<Metric 2>) [{<label>}]
+      (<minimum>,<Metric 3>) [{<label>}]
+    };
+    \addlegendentry{<Minimum or threshold>}
+
+    \addplot[fill=aaibblue, draw=aaibblue!80!black] coordinates {
+      (<actual>,<Metric 1>) [{<label>}]
+      (<actual>,<Metric 2>) [{<label>}]
+      (<actual>,<Metric 3>) [{<label>}]
+    };
+    \addlegendentry{<Actual series>}
+    \end{axis}
+  \end{tikzpicture}
+  \vspace{4pt}
+  \caption{<Chart title, period (unit). Analytical takeaway sentence. Source: source name.>}
+  \label{fig:<short-label>}
+\end{figure}
+
+% ---------------------------------------------------------------------------
+% Figure template 7: vertical bar chart with category allocation
+% ---------------------------------------------------------------------------
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.85\textwidth,
+      height=6.2cm,
+      ybar,
+      bar width=18pt,
+      ylabel={<Y-axis label>},
+      symbolic x coords={<Category 1>,<Category 2>,<Category 3>,<Category 4>},
+      xtick=data,
+      xticklabel style={font=\footnotesize, text width=2.2cm, align=center},
+      ymin=0, ymax=<ymax>,
+      ytick={<y ticks>},
+      ymajorgrids=true,
+      grid style={gray!20, dashed},
+      axis x line=bottom,
+      axis y line=left,
+      tick align=outside,
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+      nodes near coords,
+      nodes near coords style={font=\footnotesize, color=aaibblue, anchor=south},
+      every node near coord/.append style={yshift=2pt},
+      enlarge x limits=0.18,
+      clip=false,
+    ]
+    \addplot[
+      fill=aaibblue,
+      draw=aaibblue!80!black,
+    ] coordinates {
+      (<Category 1>, <value>)
+      (<Category 2>, <value>)
+      (<Category 3>, <value>)
+      (<Category 4>, <value>)
+    };
+    \end{axis}
+  \end{tikzpicture}
+  \vspace{4pt}
+  \caption{<Chart title, period (unit). Analytical takeaway sentence. Source: source name.>}
+  \label{fig:<short-label>}
+\end{figure}

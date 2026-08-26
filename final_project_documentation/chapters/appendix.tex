@@ -1,0 +1,53 @@
+\appendix
+\renewcommand{\appendixtocname}{Appendix}
+\renewcommand{\appendixpagename}{\appendixtocname}
+\addappheadtotoc
+\setboolean{@twoside}{false}
+\appendixpage
+
+\section{Glossary}\label{sec:appendix-glossary}
+\begin{table}[H]
+\centering
+\caption{Terms used throughout this documentation.}
+\label{tab:glossary}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm} X}
+\toprule
+\textbf{Term} & \textbf{Meaning} \\
+\midrule
+OKE & Oracle Kubernetes Engine: OCI's managed Kubernetes service. \\
+OCIR & Oracle Cloud Infrastructure Registry: the container image registry each service pushes to. \\
+NSG & Network Security Group: a firewall attached to individual resources rather than a whole subnet. \\
+HPA & Horizontal Pod Autoscaler: scales a Deployment's replica count between a minimum and maximum based on resource utilization. \\
+BFF & Backend for Frontend: here, \texttt{ecomm-ui}'s own API routes, most of which proxy to the corresponding backend service, though \texttt{ecomm-ui} also holds its own direct MongoDB connection alongside that proxying. \\
+GitOps & A deployment model where the desired state of the cluster lives in a Git repository, and an operator (ArgoCD) continuously reconciles the live cluster to match it. \\
+Helm chart & A templated bundle of Kubernetes manifests, parameterized by a single \texttt{values.yaml} file. \\
+ArgoCD & The GitOps controller that watches the Helm chart in \texttt{Terraform-code} and applies it to the cluster. \\
+PVC & Persistent Volume Claim: a request for durable storage, here backing the shared MongoDB deployment. \\
+ClusterIP & A Kubernetes Service type reachable only from inside the cluster, used for internal service-to-service calls. \\
+kube-proxy & The per-node Kubernetes component that implements Service-to-Pod routing; the Load Balancer's health check queries it directly on each worker node. \\
+Liveness/\allowbreak readiness probe & Kubernetes health checks against a pod: a failed liveness probe restarts the container, a failed readiness probe removes it from Service routing without restarting it. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Command Reference}\label{sec:appendix-command-reference}
+\begin{table}[H]
+\centering
+\caption{Commands referenced in this documentation, drawn from \texttt{Terraform-code/DEPLOYMENT.md}.}
+\label{tab:command-reference}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{5.4cm} X}
+\toprule
+\textbf{Command} & \textbf{Used for} \\
+\midrule
+\code{terraform init / plan / apply} & Provision the VCN, subnets, OKE cluster, and OCIR repositories \\
+\code{oci ce cluster create-kubeconfig} & Generate a local \texttt{kubectl} context for the OKE cluster \\
+\code{kubectl apply -f ./kubernetes/} & Apply the raw Kubernetes manifests directly (the non-GitOps deployment path) \\
+\code{helm install ecommerce ./helm/ecommerce-app -n ecommerce-ns} & Deploy the application through the Helm chart \\
+\code{kubectl rollout restart deployment -n ecommerce-ns} & Restart all microservice deployments in the namespace \\
+\code{helm uninstall ecommerce -n ecommerce-ns} & Remove the Helm-managed application before infrastructure teardown \\
+\code{terraform destroy} & Tear down the OKE cluster and network once the application layer is removed \\
+\bottomrule
+\end{tabularx}
+\end{table}

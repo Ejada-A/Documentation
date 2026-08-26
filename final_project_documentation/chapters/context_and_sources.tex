@@ -1,0 +1,356 @@
+\chapter{Background and Context}\label{chap:background}
+
+In this chapter, we set out the domain-ownership analysis that produced the four
+microservice boundaries, the full OKE network design (subnets, gateways, route tables,
+and security rules), the application-layer design decisions (scalability, routing,
+registry, and storage), and the trade-offs we weighed before settling on the final
+build.
+
+\section{Domain-Driven Decomposition}\label{sec:historical-current-background}
+We identified four functional domains directly from the application description: Auth,
+Product, Cart, and Purchase. A domain is defined by the data it owns, not by who is
+allowed to touch it, which is why admin CRUD on the product catalog was folded into the
+Product domain rather than treated as a separate one. Table~\ref{tab:domain-ownership}
+sets out what each domain owns and what it depends on; those dependencies are exactly
+the calls each microservice makes to the others once deployed.
+
+\begin{table}[H]
+\centering
+\caption{Domain ownership and dependencies identified during the assessment phase.}
+\label{tab:domain-ownership}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.1cm}
+                >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Domain} & \textbf{Owns} & \textbf{Depends on} \\
+\midrule
+Auth & User accounts, credentials, roles (admin, user) & Nothing \\
+Product & Catalog: name, description, price, stock, images & Auth (admin role required for create/update/delete; user role can view) \\
+Cart & Cart items, quantities, owning user & Auth (identify user, role must be ``user'') + Product (existence, stock, current price) \\
+Purchase & Orders, transactions, payment records, receipts & Auth (identify user and role) + Cart (items/quantity being purchased) + Product (confirm final price/stock at purchase time) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+All four domains map 1:1 to separate microservices, with no merging at the service
+level. Cart and Purchase were the borderline call in this mapping, which we discuss in
+Section~\ref{sec:competing-interpretations}.
+
+\section{OKE Network Design}\label{sec:domain-context}
+The network hosting these services follows Oracle's official OKE network configuration
+guidance: pods run on worker node hardware, but draw their IP addresses from a separate
+Pods subnet through a second VNIC attached to each node (VCN-native pod networking),
+rather than sharing the worker nodes' own address space. Table~\ref{tab:subnet-design}
+sets out the four subnets this design uses.
+
+\begin{table}[H]
+\centering
+\caption{The four-subnet design used for the OKE cluster.}
+\label{tab:subnet-design}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.4cm} l
+                >{\raggedright\arraybackslash}X l l}
+\toprule
+\textbf{Subnet} & \textbf{Type} & \textbf{Purpose} & \textbf{CIDR} & \textbf{Range} \\
+\midrule
+API Endpoint & Public & Kubernetes API access (\texttt{kubectl}) & 10.0.0.0/28 & .0--.15 \\
+Load Balancer & Public & Public entry point for the application & 10.0.0.16/28 & .16--.31 \\
+Worker Nodes & Private & Hosts the VMs running all pods & 10.0.16.0/20 & 10.0.16.0--10.0.31.255 \\
+Pods & Private & IP addresses for individual pods (VCN-native) & 10.0.32.0/19 & 10.0.32.0--10.0.63.255 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The Pods subnet is deliberately larger than the Worker Nodes subnet (a /19 versus a
+/20), since each node can host many pods and every pod needs its own address from that
+range.
+
+\subsection*{Gateways}
+Table~\ref{tab:gateways} sets out the three gateways that connect these subnets to the
+internet and to other OCI services.
+
+\begin{table}[H]
+\centering
+\caption{Gateways attached to the VCN.}
+\label{tab:gateways}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.8cm}
+                >{\raggedright\arraybackslash}p{4cm}
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Gateway} & \textbf{Attached to} & \textbf{Purpose} \\
+\midrule
+Internet Gateway & API Endpoint, Load Balancer subnets & Inbound/outbound internet access for public subnets \\
+NAT Gateway & Worker Nodes, Pods subnets & Outbound-only internet access for private subnets \\
+Service Gateway & Worker Nodes, Pods subnets & Private, fast path to OCI services (e.g.\ OCIR) without using NAT \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Route Tables}
+Each subnet has its own route table, summarized in Table~\ref{tab:route-tables}. The
+private subnets route Oracle Services Network traffic through the Service Gateway and
+everything else through the NAT Gateway, so pulling an image from OCIR never touches the
+NAT path.
+
+\begin{table}[H]
+\centering
+\caption{Route tables for each subnet.}
+\label{tab:route-tables}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.6cm}
+                >{\raggedright\arraybackslash}X l}
+\toprule
+\textbf{Subnet} & \textbf{Destination} & \textbf{Target} \\
+\midrule
+API Endpoint (public) & 0.0.0.0/0 & Internet Gateway \\
+Load Balancer (public) & 0.0.0.0/0 & Internet Gateway \\
+Worker Nodes (private) & All region services in Oracle Services Network & Service Gateway \\
+Worker Nodes (private) & 0.0.0.0/0 & NAT Gateway \\
+Pods (private) & All region services in Oracle Services Network & Service Gateway \\
+Pods (private) & 0.0.0.0/0 & NAT Gateway \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Network Security Group Rules}
+Every ingress and egress rule is attached at the resource level through a Network
+Security Group rather than a subnet-wide security list (we set out why in
+Section~\ref{sec:competing-interpretations}). Tables~\ref{tab:nsg-api}
+through~\ref{tab:nsg-lb} list every rule designed for each of the four subnets.
+
+\begin{table}[H]
+\centering
+\caption{NSG rules for the Kubernetes API Endpoint subnet.}
+\label{tab:nsg-api}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}p{3.4cm} l X}
+\toprule
+\textbf{Direction} & \textbf{Peer} & \textbf{Port} & \textbf{Description} \\
+\midrule
+Ingress & Worker Nodes CIDR & TCP 6443 & Worker to API endpoint communication \\
+Ingress & Worker Nodes CIDR & TCP 12250 & Worker to API endpoint communication \\
+Ingress & Pods CIDR & TCP 6443 & Pod to API endpoint communication (VCN-native) \\
+Ingress & Pods CIDR & TCP 12250 & Pod to API endpoint communication (VCN-native) \\
+Ingress & Worker Nodes CIDR & ICMP 3,4 & Path MTU Discovery \\
+Ingress & Team IPs (optional) & TCP 6443 & \texttt{kubectl} / client access, not \texttt{0.0.0.0/0} \\
+Egress & OCI Services Network & TCP 443 & API endpoint to OKE communication \\
+Egress & Pods CIDR & ALL & API endpoint to pod communication (VCN-native) \\
+Egress & Worker Nodes CIDR & ICMP 3,4 & Path MTU Discovery \\
+Egress & Worker Nodes CIDR & TCP 10250, ICMP & API endpoint to worker node communication \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{NSG rules for the Worker Nodes subnet.}
+\label{tab:nsg-workers}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}p{3.4cm} l X}
+\toprule
+\textbf{Direction} & \textbf{Peer} & \textbf{Port} & \textbf{Description} \\
+\midrule
+Ingress & Worker Nodes CIDR & ALL & Communication between worker nodes \\
+Ingress & Pods CIDR & ALL & Pods on one node reach pods on other nodes \\
+Ingress & API Endpoint CIDR & TCP ALL & API endpoint to worker node communication \\
+Ingress & 0.0.0.0/0 & ICMP 3,4 & Path MTU Discovery \\
+Ingress & Load Balancer CIDR & ALL/10256 & LB to kube-proxy health check on worker nodes \\
+Ingress & 0.0.0.0/0 (optional) & ALL/30000--32767 & NodePort traffic via LB / Network LB \\
+Egress & Worker Nodes CIDR & ALL & Communication between worker nodes \\
+Egress & Pods CIDR & ALL & Worker nodes reach pods on other nodes \\
+Egress & 0.0.0.0/0 & ICMP 3,4 & Path MTU Discovery \\
+Egress & OCI Services Network & TCP ALL & Nodes communicate with OKE \\
+Egress & API Endpoint CIDR & TCP 6443 / 12250 & Worker to API endpoint communication \\
+Egress & 0.0.0.0/0 (optional) & TCP ALL & General outbound internet access \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{NSG rules for the Pods subnet.}
+\label{tab:nsg-pods}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}p{3.4cm} l X}
+\toprule
+\textbf{Direction} & \textbf{Peer} & \textbf{Port} & \textbf{Description} \\
+\midrule
+Ingress & API Endpoint CIDR & ALL & API endpoint to pod communication \\
+Ingress & Worker Nodes CIDR & ALL & Pods on one node reach pods on other nodes \\
+Ingress & Pods CIDR & ALL & Pods communicate with each other, enabling the microservices to call each other \\
+Egress & Pods CIDR & ALL & Pods communicate with each other \\
+Egress & OCI Services Network & ICMP 3,4 & Path MTU Discovery \\
+Egress & OCI Services Network & TCP ALL & Pods communicate with OCI services \\
+Egress & API Endpoint CIDR & TCP 6443 / 12250 & Pod to API endpoint communication \\
+Egress & 0.0.0.0/0 (optional) & TCP 443 & Outbound internet access, if needed \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{NSG rules for the Load Balancer subnet.}
+\label{tab:nsg-lb}
+\small
+\begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}p{3.4cm} l X}
+\toprule
+\textbf{Direction} & \textbf{Peer} & \textbf{Port} & \textbf{Description} \\
+\midrule
+Ingress & 0.0.0.0/0 & TCP 443 & Public traffic to the Load Balancer \\
+Egress & Worker Nodes CIDR & ALL/30000--32767 & LB forwards traffic to worker nodes \\
+Egress & Worker Nodes CIDR & ALL/10256 & LB communicates with kube-proxy health check \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+SSH (TCP 22) inbound to worker nodes is left as an explicit optional rule for
+troubleshooting rather than a standing part of the design.
+
+\section{Security Design}\label{sec:regulatory-financial-policy-context}
+Table~\ref{tab:security-design} sets out the security posture the design called for
+across five areas.
+
+\begin{table}[H]
+\centering
+\caption{Security design decisions.}
+\label{tab:security-design}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm} X}
+\toprule
+\textbf{Area} & \textbf{Design decision} \\
+\midrule
+Network isolation & Only the Load Balancer subnet is public-facing; Worker Nodes and Pods subnets are private \\
+Access control & NSGs used for granular, per-resource rules rather than broad security lists \\
+API access & Kubernetes API endpoint access restricted to known team IPs, not \texttt{0.0.0.0/0} \\
+Secrets & Database credentials and API keys stored as Kubernetes Secrets backed by OCI Vault, never hardcoded in code, images, or Git \\
+IAM & Worker nodes granted a narrowly-scoped dynamic group policy (e.g.\ OCIR image pulls, Vault reads), not broad compartment-admin rights \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Two further constraints shape how traffic and access are handled beyond this table.
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{NAT and Service Gateways split egress traffic by destination.} Worker
+        nodes and pods reach the public internet outbound-only through the NAT Gateway,
+        while traffic bound for other OCI services takes the private Service Gateway
+        path instead, matching Table~\ref{tab:route-tables}.
+  \item \textbf{A minimum of two worker nodes is enforced regardless of final sizing.}
+        This gives every deployment's pod replicas real node-level redundancy rather
+        than all landing on a single node.
+\end{itemize}
+
+\section{Application-Layer Design Decisions}\label{sec:app-layer-design}
+Beyond the network itself, four further decisions were made during the assessment
+phase: how each service scales, how traffic is routed to it, how its image is
+registered, and how it stores data.
+
+\subsection*{Scalability: Replica Strategy}
+Each microservice was designed to use a Horizontal Pod Autoscaler with its own minimum
+and maximum replica count, rather than one fixed policy for every service, so the
+deployed environment stays small and low-cost for realistic traffic while still
+demonstrating per-service scaling design. Table~\ref{tab:hpa-design} sets out the
+reasoning behind each service's thresholds; we compare this against the deployed
+autoscaling policy in Section~\ref{sec:primary-finding-two}.
+
+\begin{table}[H]
+\centering
+\caption{Per-service HPA design and reasoning.}
+\label{tab:hpa-design}
+\small
+\begin{tabularx}{\textwidth}{l c c X}
+\toprule
+\textbf{Service} & \textbf{Min} & \textbf{Max} & \textbf{Reasoning} \\
+\midrule
+Auth & 1 & 3 & Every request depends on it, so it needs headroom under load \\
+Product & 1 & 3 & Constant read traffic from browsing \\
+Cart & 1 & 2 & Frequent but tolerant of brief unavailability \\
+Purchase & 2 & 3 & Financial data, never allowed to run on a single replica \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Traffic Routing}
+A single Load Balancer and Ingress Controller was designed to give the frontend one
+public entry point, routed to each service by path, as set out in
+Table~\ref{tab:routing-design}. We compare this against the deployed ingress rules in
+Section~\ref{sec:primary-finding-two}.
+
+\begin{table}[H]
+\centering
+\caption{Designed path-based routing.}
+\label{tab:routing-design}
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Path} & \textbf{Routed to} \\
+\midrule
+\texttt{/api/auth/*} & Auth service \\
+\texttt{/api/products/*} & Product service \\
+\texttt{/api/cart/*} & Cart service \\
+\texttt{/api/purchase/*} & Purchase service \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{Container Registry}
+Each microservice was designed to have its own OCIR repository, matching the 1:1
+microservice mapping: \texttt{groupa-auth-app}, \texttt{groupa-product-app},
+\texttt{groupa-cart-app}, and \texttt{groupa-purchase-app}.
+
+\subsection*{Storage}
+Each microservice was designed to own its data through a database-per-service pattern:
+four separate databases, one per microservice, with no database shared across services,
+each persisting through its own PVC (Block Volume), following the storage pattern
+established in earlier weeks. The isolation reasoning mirrors the Cart-versus-Purchase
+split in Section~\ref{sec:competing-interpretations}: Purchase's permanent financial
+records must stay isolated from Cart's high-churn, temporary data. The specific database
+engine per service was left as an implementation detail for the build phase.
+
+\section{Evidence and Verification Basis}\label{sec:source-quality}
+This documentation covers one specific system we designed and built, rather than a
+literature-based analysis. Table~\ref{tab:source-quality} summarizes the kinds of
+evidence referenced throughout, at the point each one supports a claim.
+
+\begin{table}[H]
+\centering
+\caption{Evidence types used to support claims in this documentation.}
+\label{tab:source-quality}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.6cm}
+                >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Evidence type} & \textbf{What it confirms} & \textbf{Basis for trust} \\
+\midrule
+Assessment and design documentation & The intended domain boundaries, network design, and application-layer decisions & Written during the assessment phase, before implementation began \\
+Terraform configuration (\texttt{Terraform-\allowbreak code/}) & The declared network, OKE cluster, and OCIR resources & Committed source, reproducible with \texttt{terraform plan} \\
+Kubernetes manifests and Helm chart (\texttt{kuber-\allowbreak netes/}, \texttt{helm/\allowbreak ecommerce-\allowbreak app/}) & The declared workloads, services, ingress rules, and autoscaling policy actually shipped to the cluster & Committed source, applied via \texttt{kubectl}, Helm, or ArgoCD \\
+GitHub Actions workflow files (\texttt{.github/\allowbreak workflows/}) & How each service's image is built, tagged, and promoted into the Helm chart & Committed workflow definitions, one per repository \\
+Application source (\texttt{server.ts}, models, Next.js routes) & What each service's API actually exposes and how it talks to the others & Read directly from each service repository \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Design Trade-offs Considered}\label{sec:competing-interpretations}
+Two decisions in Table~\ref{tab:domain-ownership} were not automatic, and are worth
+setting out explicitly.
+
+\textbf{Cart versus Purchase.} These two were the borderline call in the domain mapping,
+resolved in favor of keeping them fully separate services rather than merging them.
+Cart holds temporary, high-churn data, while Purchase holds permanent, immutable
+financial records that must stay isolated from Cart bugs; the two also have very
+different traffic and scaling profiles, with Cart hit constantly and Purchase hit rarely
+but needing to prioritize reliability over speed. In the deployed system, the Cart
+domain's persistent, validated side is implemented inside the Orders service, with the
+shopping cart itself held client-side (in the browser) until checkout; the Purchase
+domain is implemented as the Payments service.
+
+\textbf{Network Security Groups versus Security Lists.} For this specific design, the
+two mechanisms would enforce identical traffic, since each subnet holds exactly one
+resource type. NSGs were used regardless, because they attach to individual resources
+rather than to a whole subnet, matching Oracle's own recommendation, decoupling security
+policy from network topology, and remaining reusable if the design changes later, for
+example if a subnet ever hosts more than one type of resource.
