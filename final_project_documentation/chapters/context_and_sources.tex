@@ -342,10 +342,10 @@ setting out explicitly.
 resolved in favor of keeping them fully separate services rather than merging them.
 Cart holds temporary, high-churn data, while Purchase holds permanent, immutable
 financial records that must stay isolated from Cart bugs; the two also have very
-different traffic and scaling profiles, with Cart hit constantly and Purchase hit rarely
-but needing to prioritize reliability over speed. In the deployed system, the Cart
-domain's persistent, validated side is implemented inside the Orders service, with the
-shopping cart itself held client-side (in the browser) until checkout; the Purchase
+different traffic and reliability profiles, with Cart hit constantly and Purchase hit
+rarely but needing to prioritize reliability over speed. In the deployed system, the
+Cart domain's persistent, validated side is implemented inside the Orders service, with
+the shopping cart itself held client-side (in the browser) until checkout; the Purchase
 domain is implemented as the Payments service.
 
 \textbf{Network Security Groups versus Security Lists.} For this specific design, the

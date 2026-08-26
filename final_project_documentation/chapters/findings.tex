@@ -22,10 +22,9 @@ Registry, through the Service Gateway rather than the NAT path.}
 \label{fig:topology}
 \end{figure}
 
-Figure~\ref{fig:app-access} narrows in on the application layer inside the Pods subnet:
-the Ingress Controller's path-based routing to each of the five workloads, and the
-shared MongoDB instance every one of them, including the frontend itself, connects to
-directly.
+Figure~\ref{fig:app-access} narrows in on the application layer: the Ingress
+Controller's path-based routing to each of the five workloads, and the shared MongoDB
+instance every one of them, including the frontend itself, connects to directly.
 
 \begin{figure}[H]
 \centering
