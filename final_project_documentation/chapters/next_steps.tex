@@ -1,8 +1,9 @@
 \chapter{Troubleshooting}\label{chap:troubleshooting}
 
-Table~\ref{tab:troubleshooting} lists common symptoms, diagnostic commands, and
-likely causes, based on the operational commands in
-\texttt{Terraform-code/DEPLOYMENT.md} and the deployment mechanics in
+Based on our deployment and testing work, we assembled
+Table~\ref{tab:troubleshooting} to connect common symptoms with diagnostic
+commands and likely causes. We based these checks on the operational commands in
+\texttt{Terraform-\allowbreak code/\allowbreak DEPLOYMENT.md} and the deployment mechanics in
 Chapter~\ref{chap:Methodology}.
 
 \begin{table}[H]
@@ -23,7 +24,7 @@ A new image never rolls out after a push & Check the run status of \code{ci.yml}
 ArgoCD shows \code{OutOfSync} & \code{argocd app get ecommerce-app} & \texttt{selfHeal} will revert any manual \texttt{kubectl edit}; the fix is always a Git commit to \texttt{Terraform-code}, never a live edit \\[5pt]
 A request to a backend path returns 502/504 & \code{kubectl get endpoints -n ecommerce-ns} and re-check Table~\ref{tab:ingress-routing} & The target Service has no Ready pods behind it, or the ingress path/port does not match the Service definition \\[5pt]
 Pods across the namespace show \code{Image\allowbreak PullBackOff} at the same time & \code{kubectl describe pod <pod> -n ecommerce-ns} and check the \code{ocir-secret} age & The \texttt{OCI\_AUTH\_TOKEN} behind \code{ocir-secret} is a permanent OCI Auth Token; if it was ever regenerated as a short-lived CLI token instead, pulls fail once it expires \\[5pt]
-An order shows \code{paid} that was never actually paid & \code{kubectl logs -n ecommerce-ns -l app=payments-\allowbreak service --tail=50} and check the Stripe dashboard for a matching session & Consistent with Section~\ref{sec:sec-payments}: \code{/api/orders/confirm} does not verify the Stripe session, so any call with a valid \code{orderId} succeeds \\
+An order shows \code{paid} that was never actually paid & \code{kubectl logs -n ecommerce-ns -l app=payments-\allowbreak service --tail=50} and check the Stripe dashboard for a matching session & Stripe session validation or order-to-session matching may have regressed; compare the request with the verified behavior in Section~\ref{sec:testing} \\
 \bottomrule
 \end{tabularx}
 \renewcommand{\arraystretch}{1}

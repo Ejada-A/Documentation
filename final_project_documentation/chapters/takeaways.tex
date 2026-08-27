@@ -1,30 +1,32 @@
 \chapter{Limitations and Future Improvements}\label{chap:limitations}
 
 \begin{warningbox}[Current Limitations]
-A few areas are still early or incomplete. Backend services and BFF routes do not
-yet enforce authorization before mutating data (Section~\ref{sec:sec-app-auth}),
-and regular users are not issued a session or token. Payment confirmation
-currently relies on a client call rather than a Stripe webhook or session check
-(Section~\ref{sec:sec-payments}). The \texttt{/products}, \texttt{/products/[id]},
+Our review identified a few areas that are still early or incomplete. Although we
+closed the six critical QA findings during the production remediation cycle
+(Section~\ref{sec:testing}), we found that regular users are still not issued a
+session or token. Moreover, the \texttt{/products}, \texttt{/products/[id]},
 and \texttt{/categories} pages are still placeholders
 (Section~\ref{sec:frontend-completeness}), as is the admin dashboard's metrics
-display. MongoDB runs without authentication or redundancy
+display. We also found that MongoDB runs without authentication or redundancy
 (Section~\ref{sec:sec-data}), and \texttt{values.yaml} still carries an unused
-plaintext secrets block worth cleaning up (Section~\ref{sec:sec-secrets}). The
-Kubernetes API endpoint, worker SSH, and the NodePort range are currently
+plaintext secrets block worth cleaning up (Section~\ref{sec:sec-secrets}). In
+addition, the Kubernetes API endpoint, worker SSH, and the NodePort range are currently
 reachable from \texttt{0.0.0.0/0} (Section~\ref{sec:sec-network}), and the Helm
 chart and raw Kubernetes manifests define slightly different HPA policies
-(Section~\ref{sec:scaling-resource-allocation}). Automated tests are not yet part
-of any of the six repositories, and a few frontend dependencies (\texttt{zod},
+(Section~\ref{sec:scaling-resource-allocation}). The production regression suite
+is maintained separately rather than executed by our six repositories' CI
+workflows, and a few frontend dependencies (\texttt{zod},
 \texttt{next-auth}, \texttt{bcryptjs} in \texttt{ecomm-ui}) are declared but not
 yet used.
 \end{warningbox}
 
-\section{Recommended Next Steps}\label{sec:recommended-actions}
+\section{Our Recommended Next Steps}\label{sec:recommended-actions}
+Based on these findings, we recommend the following next steps for continuing our
+work:
 \begin{enumerate}[leftmargin=1.4em]
-  \item \textbf{Verify Stripe payments server-side} by replacing the
-        client-triggered \texttt{/api/orders/confirm} call with a webhook that
-        checks the event signature before marking an order paid.
+  \item \textbf{Integrate the production regression suite into CI} so the 95
+        checks run automatically before deployment and prevent a recurrence of
+        the payment-service file regression.
   \item \textbf{Complete the \texttt{/products}, \texttt{/products/[id]}, and
         \texttt{/categories} pages}; the fetch and rendering logic is already
         sketched out in code comments in each file.
@@ -37,23 +39,3 @@ yet used.
   \item \textbf{Enable MongoDB authentication} and consider whether the five
         workloads should keep sharing one instance and one set of collections.
 \end{enumerate}
-
-\section{Monitoring Recommendations}\label{sec:monitoring-indicators}
-\begin{table}[H]
-\centering
-\caption{Indicators worth monitoring as this deployment matures.}
-\label{tab:monitoring-indicators}
-\small
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X
-                >{\raggedright\arraybackslash}X
-                >{\raggedright\arraybackslash}X}
-\toprule
-\textbf{Indicator} & \textbf{Why It Matters} & \textbf{Review Frequency} \\
-\midrule
-Per-workload HPA CPU utilization vs.\ the 75\% threshold & Signals whether the uniform autoscaling policy fits each service's actual traffic shape & Ongoing \\
-ArgoCD sync status for \texttt{ecommerce-app} & Confirms the running cluster still matches the Helm chart in \texttt{Terraform-code} & Continuous, via ArgoCD's own dashboard \\
-MongoDB PVC utilization (10Gi, shared, single replica) & Signals capacity pressure on the one database instance every workload depends on & Monthly \\
-Requests to \texttt{/api/orders/confirm} & This route does not verify the underlying Stripe session (Section~\ref{sec:sec-payments}) & Until webhook-based verification is added \\
-\bottomrule
-\end{tabularx}
-\end{table}

@@ -1,7 +1,7 @@
 \chapter{System Architecture}\label{chap:background}
 
 \section{Repository Overview}\label{sec:repo-overview}
-The system is distributed across six repositories under the \texttt{Ejada-A}
+We organized the system across six repositories under the \texttt{Ejada-A}
 GitHub organization. Table~\ref{tab:repo-overview} summarises the responsibility
 and structure of each one.
 
@@ -25,19 +25,21 @@ and structure of each one.
 \end{tabularx}
 \end{table}
 
-Each backend service uses a flat Express structure. Routes and request handlers are
+We found that each backend service uses a flat Express structure. Routes and request handlers are
 defined in \texttt{server.ts}, where each handler calls the corresponding Mongoose
 model directly; there is no separate controller, service, or repository layer.
 
 \begin{infobox}[Note]
-Automated tests are not currently included in the six repositories.
-\texttt{Terraform-code}'s \texttt{test-runner.yml} workflow contains a placeholder
-check (\texttt{echo "Runner works"}) rather than an application or infrastructure
-test suite.
+We maintain our production QA coverage in the dedicated
+\texttt{EjadaStore-Testing} repository (Section~\ref{sec:testing}). However, we
+found that the six implementation repositories do not yet include this suite in
+their own CI workflows; \texttt{Terraform-code}'s \texttt{test-runner.yml}
+contains a placeholder check (\texttt{echo "Runner works"}).
 \end{infobox}
 
+\newpage
 \section{Service Responsibilities}\label{sec:historical-current-background}
-The backend is divided into four services, each with its own repository:
+We divided the backend into four services, each with its own repository:
 \texttt{auth-service}, \texttt{products-service}, \texttt{orders-service}, and
 \texttt{payments-service}. Table~\ref{tab:domain-ownership} sets out what each
 service owns.
@@ -61,7 +63,8 @@ service owns.
 \end{table}
 
 \begin{infobox}[Service Communication]
-The backend services do not call each other over HTTP. \texttt{orders-service} and
+During our review, we found that the backend services do not call each other over
+HTTP. Instead, \texttt{orders-service} and
 \texttt{payments-service} each declare their own local copy of the
 \texttt{product.model.ts} Mongoose schema and query it directly, since all five
 workloads connect to the same MongoDB instance and database; Mongoose resolves a
@@ -71,8 +74,9 @@ system happens in \texttt{ecomm-ui}'s BFF routes, which call each backend servic
 its Kubernetes Service DNS name.
 \end{infobox}
 
+\newpage
 \section{Technology Stack}\label{sec:tech-stack}
-Table~\ref{tab:tech-stack} summarises the technologies and versions used across the
+We summarise the technologies and versions used across the
 application and infrastructure layers.
 
 \begin{table}[H]
@@ -103,8 +107,10 @@ GitOps & ArgoCD (upstream manifests, installed by \texttt{deploy.yml}), NGINX In
 All five workloads share a single MongoDB instance with no per-service database
 split.
 
+\newpage
 \section{Deployed Architecture}\label{sec:deployed-architecture}
-Figure~\ref{fig:topology} shows the deployed network and OKE architecture: four
+To present the deployed design clearly, we use Figure~\ref{fig:topology} to show
+the network and OKE architecture: four
 subnets, the Internet/NAT/Service gateway split, and the shared MongoDB PVC in the
 Pods subnet.
 
@@ -119,7 +125,7 @@ Neither the API endpoint path nor the Load Balancer path currently restricts inb
 traffic by source IP; Chapter~\ref{chap:security} covers the network configuration
 in full.
 
-Figure~\ref{fig:app-access} shows the application-layer routing: the ingress routes
+Moreover, Figure~\ref{fig:app-access} shows the application-layer routing: the ingress routes
 by path to each of the five workloads, all of which connect to the same MongoDB
 instance.
 
@@ -185,7 +191,7 @@ with the Helm chart automatically. The two paths currently define different
 autoscaling policies (Section~\ref{sec:scaling-resource-allocation}).
 
 \section{Network Architecture}\label{sec:domain-context}
-The OKE cluster network uses four subnets, summarised in
+We configured the OKE cluster network with four subnets, which we summarise in
 Table~\ref{tab:subnet-design}. The full set of gateway, route table, and NSG rules
 is in Appendix~\ref{sec:appendix-network}.
 
@@ -208,7 +214,7 @@ Pods & Private & IP addresses for individual pods (VCN-native) & 10.0.32.0/19 & 
 \end{table}
 
 \begin{infobox}[Note]
-The network module (\texttt{modules/network/variables.tf}) defines four boolean
+We found that the network module (\texttt{modules/\allowbreak network/\allowbreak variables.tf}) defines four boolean
 switches, each defaulting to \texttt{false}, that control worker SSH access,
 general worker outbound traffic, pod outbound internet access, and public
 NodePort access. The root module (\texttt{main.tf}) sets all four to
@@ -217,14 +223,16 @@ covers the security implications.
 \end{infobox}
 
 \section{Scaling and Routing}\label{sec:app-layer-design}
-Every workload scales through its own Horizontal Pod Autoscaler, and the ingress
-routes to each service by path. Section~\ref{sec:scaling-resource-allocation} covers
+We configured every workload to scale through its own Horizontal Pod Autoscaler,
+while the ingress routes to each service by path. Moreover,
+Section~\ref{sec:scaling-resource-allocation} covers
 the exact policy and a difference between the two deployment paths.
 
 \section{Design Draft vs.\ Implementation}\label{sec:draft-vs-implementation}
-The original Architecture \& Design Draft set out the intended design before
-implementation began. Table~\ref{tab:draft-vs-impl} summarises how the current
-implementation compares, including areas the draft did not originally cover.
+We began with the Architecture \& Design Draft as our intended design. However,
+our source review showed that some implementation decisions evolved during the
+build. Table~\ref{tab:draft-vs-impl} summarises these differences, including areas
+the draft did not originally cover.
 
 \begin{table}[H]
 \centering
@@ -247,7 +255,7 @@ Payment confirmation & Partially implemented & A Stripe Checkout session is crea
 Full storefront browsing & Partially implemented & The homepage and admin panels are functional; the product listing, product detail, and category pages remain incomplete (Section~\ref{sec:frontend-completeness}) \\
 Two parallel deployment manifests & Repository-only & A raw-manifest path and a Helm-chart path both exist and currently define different HPA policies; the draft describes neither (Section~\ref{sec:scaling-resource-allocation}) \\
 TLS certificate source & Implemented differently & An AWS ACM certificate was tried first for the ingress; ACM certificates are locked to AWS infrastructure and cannot export a private key, so the team moved to cert-manager with a Let's Encrypt \texttt{ClusterIssuer} instead (Section~\ref{sec:bootstrap-pipeline}) \\
-Automated testing & Repository-only & Automated tests are not included in any of the six repositories \\
+Automated testing & Implemented separately & We maintain the production regression suite in \texttt{EjadaStore-Testing}; CI integration with the six implementation repositories remains a next step \\
 \bottomrule
 \end{tabularx}
 \end{table}

@@ -1,30 +1,34 @@
 \chapter{Project Overview}\label{chap:intro}
 
-An e-commerce application, split into five independently deployable Git repositories
-(four backend services plus a Next.js frontend) and deployed to Oracle Kubernetes
-Engine (OKE) with a Terraform-provisioned cluster and a Helm/ArgoCD GitOps pipeline.
-Built by Group A for the final week of the Ejada Cloud Build Track internship.
+For the final week of the Ejada Cloud Build Track internship, our Group A team
+split an e-commerce application into five independently deployable Git
+repositories: four backend services and a Next.js frontend. We then deployed the
+system to Oracle Kubernetes Engine (OKE) using a Terraform-provisioned cluster
+and a Helm/ArgoCD GitOps pipeline.
 
 \section{Objectives and Scope}\label{sec:core-question}
-The build had two objectives: split the application into microservice boundaries
-based on data ownership, each with its own repository and container image; and
-automate the path from a code push to a running pod.
+We set two main objectives for the build: first, to split the application into
+microservice boundaries based on data ownership, each with its own repository and
+container image; and second, to automate the path from a code push to a running
+pod.
 
-\textbf{In scope:} one OCI region (\texttt{me-jeddah-1}), one compartment
+\textbf{For our initial scope, we focused on:} one OCI region (\texttt{me-jeddah-1}), one compartment
 (\texttt{shared-group-a-cmp}), one OKE cluster and namespace
 (\texttt{ecommerce-ns}), the five application repositories above, and the
 \texttt{Terraform-code} repository holding the infrastructure, Kubernetes manifests,
 and Helm chart.
 
-\textbf{Out of scope:} automated testing, multi-region or multi-availability-domain
-high availability, and a production security review. Three customer-facing
-storefront pages remain incomplete (see Section~\ref{sec:frontend-completeness}),
-and a few areas of the implementation differ from the original design draft,
-summarised in Section~\ref{sec:draft-vs-implementation}.
+\textbf{We initially treated as out of scope:} automated testing, multi-region or
+multi-availability-domain high availability, and a production security review.
+However, we later added a dedicated QA and remediation cycle
+(Section~\ref{sec:testing}). We also found that three customer-facing storefront
+pages remain incomplete (Section~\ref{sec:frontend-completeness}) and that a few
+areas of our implementation differ from the original design draft, as we
+summarise in Section~\ref{sec:draft-vs-implementation}.
 
 \section{Project Ownership}\label{sec:key-stakeholders}
-Table~\ref{tab:stakeholder-map} lists each team member's area of responsibility
-for this build.
+We summarise each team member's area of responsibility in
+Table~\ref{tab:stakeholder-map}.
 
 \begin{table}[H]
 \centering

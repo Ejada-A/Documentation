@@ -1,30 +1,37 @@
-\chapter*{Executive Summary}
-\addcontentsline{toc}{chapter}{Executive Summary}
+\chapter*{Technical Summary}
+\addcontentsline{toc}{chapter}{Technical Summary}
 \label{chap:abstract}
 \pagestyle{plain}
 
-An e-commerce application split into four independently deployable microservices
-(\texttt{auth-service}, \texttt{products-service}, \texttt{orders-service}, and
-\texttt{payments-service}) plus a Next.js frontend, deployed to Oracle Kubernetes
-Engine (OKE) through a Terraform-provisioned cluster and a Helm/ArgoCD GitOps
-pipeline. Each service maps 1:1 to its own Git repository and container image, and
-a push to \texttt{main} reaches a running pod with no manual \texttt{kubectl apply} step.
+In this project, we split an e-commerce application into four independently
+deployable microservices (\texttt{auth-service}, \texttt{products-service},
+\texttt{orders-service}, and \texttt{payments-service}) and a Next.js frontend.
+We deployed the system to Oracle Kubernetes Engine (OKE) through a
+Terraform-provisioned cluster and a Helm/ArgoCD GitOps pipeline. Moreover, we
+mapped each service to its own Git repository and container image so that a push
+to \texttt{main} can reach a running pod without a manual \texttt{kubectl apply}
+step.
 
 \begin{itemize}[leftmargin=1.4em]
-  \item \textbf{The four services own separate data models but share one database.}
+  \item \textbf{We separated the application into four service-owned data models.}
+        However, we found that the services still share one database:
         \texttt{orders-service} and \texttt{payments-service} read and write the
         \texttt{products} collection directly rather than calling
         \texttt{products-service} over HTTP; the backend services do not call each
         other.
-  \item \textbf{The infrastructure is fully GitOps-driven.} Each service's CI
-        pipeline builds and pushes its image to OCIR, a shared workflow updates the
-        matching tag in the Helm chart's \texttt{values.yaml}, and ArgoCD reconciles
-        the cluster automatically.
-  \item \textbf{Backend mutation routes do not currently enforce authorization}, and
-        payment confirmation relies on a client redirect rather than a verified
-        Stripe event (see Chapter~\ref{chap:security}).
+  \item \textbf{We implemented a fully GitOps-driven infrastructure workflow.}
+        Each service's CI pipeline builds and pushes its image to OCIR, a shared
+        workflow updates the matching tag in the Helm chart's
+        \texttt{values.yaml}, and ArgoCD reconciles the cluster automatically.
+  \item \textbf{We used production QA to drive a focused security-remediation
+        cycle.} We closed all six critical findings, including unauthorized mutations,
+        an exposed database-seed route, invalid order quantities, and unverified
+        Stripe payment confirmation (Section~\ref{sec:testing}).
 \end{itemize}
 
-Three storefront pages and the admin dashboard's metrics remain placeholders, and
-none of the six repositories currently include automated tests. Chapter~\ref{chap:limitations}
-covers the current state in full.
+However, we found that three storefront pages and the admin dashboard's metrics
+remain placeholders. We also created a separate QA repository that now provides
+production regression coverage, with 93 of 95 checks passing after remediation.
+However, we have not yet integrated the suite into the six implementation
+repositories. We discuss this and our other next steps in
+Chapter~\ref{chap:limitations}.

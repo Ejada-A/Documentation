@@ -1,10 +1,10 @@
 \chapter{Infrastructure and Deployment}\label{chap:Methodology}
 
-This chapter covers how the OKE cluster is provisioned, how a code change reaches a
-running pod, and how to deploy and configure the system.
+In this chapter, we explain how we provisioned the OKE cluster, how our code
+changes reach running pods, and how we deploy and configure the system.
 
 \section{Terraform Module Structure}\label{sec:manual-console-build}
-The root module (\texttt{Terraform-code/main.tf}) wires together two child modules,
+We structured the root module (\texttt{Terraform-\allowbreak code/\allowbreak main.tf}) around two child modules,
 \texttt{network} and \texttt{oke}, resolves the latest Oracle Linux 8 image for the
 chosen compute shape, and provisions one OCIR repository per microservice from a
 single \texttt{for\_each} over \texttt{local.microservices}. State is stored in an
@@ -12,7 +12,7 @@ S3-compatible OCI Object Storage backend (\texttt{providers.tf}), not locally. T
 cluster runs Kubernetes v1.34.2, set explicitly in the \texttt{oke} module call.
 
 \subsection*{Module Interfaces}
-Figure~\ref{fig:network-module} shows the \texttt{network} module's inputs and
+We use Figure~\ref{fig:network-module} to show the \texttt{network} module's inputs and
 outputs, including four boolean access switches that default to \texttt{false} in
 the module itself (Section~\ref{sec:domain-context}).
 
@@ -59,7 +59,7 @@ the module itself (Section~\ref{sec:domain-context}).
 \label{fig:network-module}
 \end{figure}
 
-Figure~\ref{fig:oke-module} shows the \texttt{oke} module's interface; network
+Moreover, Figure~\ref{fig:oke-module} shows the \texttt{oke} module's interface; network
 placement and NSG IDs are consumed directly from the \texttt{network} module's
 outputs.
 
@@ -107,7 +107,7 @@ outputs.
 \end{figure}
 
 \section{Root Module Configuration}\label{sec:research-method}
-The root Terraform module accepts the variables in Table~\ref{tab:variables}
+We summarise the root Terraform module's variables in Table~\ref{tab:variables}
 (\texttt{variable.tf}).
 
 \begin{table}[H]
@@ -134,8 +134,8 @@ The root Terraform module accepts the variables in Table~\ref{tab:variables}
 \end{table}
 
 \section{Configuration Patterns}\label{sec:analytical-framework}
-Every NSG ingress/egress rule, for every subnet, is declared once as data in
-\texttt{modules/network/locals.tf} (\texttt{ingress\_by\_nsg}, \texttt{egress\_by\_nsg}),
+We declared every NSG ingress and egress rule, for every subnet, once as data in
+\texttt{modules/\allowbreak network/\allowbreak locals.tf} (\texttt{ingress\_by\_nsg}, \texttt{egress\_by\_nsg}),
 then flattened into one map keyed by \texttt{"<subnet>-<index>"} so a single
 \texttt{for\_each} generates every \texttt{oci\_core\_network\_security\_group\_\allowbreak
 security\_rule} resource:
@@ -149,21 +149,21 @@ ingress_rules_flat = merge([
 ]...)
 \end{lstlisting}
 
-Adding a rule means adding one object to a list in \texttt{ingress\_by\_nsg} or
+Therefore, adding a rule only requires one new object in \texttt{ingress\_by\_nsg} or
 \texttt{egress\_by\_nsg}; the resource block itself never changes. The same pattern
 builds the four subnets and their NSGs from typed maps rather than one block per
 subnet.
 
 \section{CI/CD Pipeline}\label{sec:evaluation-criteria}
-Each of the five application repositories has its own \texttt{ci.yml} workflow,
+We configured each of the five application repositories with its own \texttt{ci.yml} workflow,
 triggered on push to \texttt{main}. All five follow the same template: a
 multi-architecture image build (\texttt{linux/amd64}, \texttt{linux/arm64} via
 Docker Buildx and QEMU), OCIR authentication through a short-lived OCI CLI token,
 and a push tagged with both the GitHub Actions run number and \texttt{latest}.
-The \texttt{arm64} target matches the OKE node pool itself: \texttt{node\_shape}
+Moreover, the \texttt{arm64} target matches the OKE node pool itself: \texttt{node\_shape}
 defaults to \texttt{VM.Standard.A1.Flex}, an Ampere ARM64 compute shape, so every
 image needs an ARM64 variant to run on the cluster's worker nodes.
-Table~\ref{tab:change-criteria} shows how a code change reaches the running
+We summarise how a code change reaches the running
 cluster.
 
 \begin{table}[H]
@@ -184,8 +184,8 @@ ArgoCD reconciliation & ArgoCD's automated sync (\texttt{prune: true}, \texttt{s
 \end{tabularx}
 \end{table}
 
-Figure~\ref{fig:pipeline-flow} is the team's own diagram of this pipeline, drawn
-across all five repositories: each one builds its image and pushes it to OCIR,
+We created Figure~\ref{fig:pipeline-flow} to show this pipeline across all five
+repositories: each one builds its image and pushes it to OCIR,
 a shared checkout/update-charts/push job writes the new tag into the Helm chart,
 and ArgoCD watches that chart and updates the cluster. It runs automatically on
 every push and does not provision infrastructure, which is handled separately
@@ -199,22 +199,22 @@ every push and does not provision infrastructure, which is handled separately
 \end{figure}
 
 \section{Infrastructure Bootstrap Pipeline}\label{sec:bootstrap-pipeline}
-\texttt{Terraform-code/.github/workflows/deploy.yml} provisions the environment from
+We created \texttt{Terraform-\allowbreak code/\allowbreak .github/\allowbreak workflows/\allowbreak deploy.yml} to provision the environment from
 a clean account. Triggered manually (\texttt{workflow\_dispatch}) rather than on
 push, it runs, in order: \texttt{terraform apply}; extracts the new cluster's OCID
 and load balancer subnet OCID from the Terraform output; generates a kubeconfig
 from that cluster OCID; installs the NGINX Ingress Controller via Helm, passing
 the load balancer subnet OCID through the
-\texttt{service.beta.kubernetes.io/oci-load-balancer-subnet1} annotation so OCI
+\texttt{service.\allowbreak beta.\allowbreak kubernetes.\allowbreak io/\allowbreak oci-load-balancer-subnet1} annotation so OCI
 knows where to attach the Load Balancer; installs cert-manager and a
 \texttt{letsencrypt-prod} \texttt{ClusterIssuer} (HTTP-01, using the
 \texttt{ADMIN\_EMAIL} secret as the ACME registration email) so the ingress's TLS
 certificate is issued automatically; creates the \texttt{ocir-secret} and
 \texttt{app-secrets} Kubernetes Secrets from encrypted GitHub Actions secrets;
 installs ArgoCD from its upstream manifest; and applies
-\texttt{argocd/ecommerce-app.yaml} and \texttt{argocd/argocd-ingress.yaml}. The
+\texttt{argocd/\allowbreak ecommerce-app.yaml} and \texttt{argocd/\allowbreak argocd-ingress.yaml}. The
 kubeconfig step runs before any \texttt{helm}/\texttt{kubectl} command that
-depends on it. This one workflow assembles the full stack: infrastructure,
+depends on it. Together, these steps assemble the full stack: infrastructure,
 ingress controller and TLS, secrets, and the GitOps controller. Because Terraform
 state lives in the S3-compatible OCI backend rather than on the runner, re-running
 the workflow updates the existing infrastructure instead of provisioning a duplicate VCN or
@@ -229,8 +229,8 @@ configuration.}
 \label{fig:bootstrap-flow}
 \end{figure}
 
-Table~\ref{tab:bootstrap-secrets} lists the GitHub Actions secrets
-\texttt{deploy.yml} reads, grouped by what they configure.
+We group the GitHub Actions secrets read by \texttt{deploy.yml} according to what
+they configure in Table~\ref{tab:bootstrap-secrets}.
 
 \begin{table}[H]
 \centering
@@ -255,8 +255,8 @@ Table~\ref{tab:bootstrap-secrets} lists the GitHub Actions secrets
 
 \clearpage
 \section{Container Images and Health Checks}\label{sec:container-build}
-Every backend service is built from the same two-stage Dockerfile pattern, shown
-here for \texttt{auth-service}. All five images use \texttt{node:20-slim} rather
+We built every backend service from the same two-stage Dockerfile pattern, shown
+here for \texttt{auth-service}. We selected \texttt{node:20-slim} for all five images rather
 than an Alpine base: the OKE node pool runs ARM64, and cross-compiling Alpine
 images for \texttt{arm64} under QEMU produced \texttt{Illegal instruction} crashes
 at runtime, which the Debian-based slim image does not have.
@@ -281,13 +281,13 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 CMD ["npm", "start"]
 \end{lstlisting}
 
-\texttt{ecomm-ui} uses a three-stage variant (\texttt{deps}/\texttt{builder}/\texttt{runner})
+For \texttt{ecomm-ui}, we used a three-stage variant (\texttt{deps}/\texttt{builder}/\texttt{runner})
 that produces a Next.js standalone build, running as a dedicated \texttt{nextjs}
 user (UID 1001) rather than the base image's built-in \texttt{node} user. Both
 Dockerfile families run as non-root and expose a Docker-level
 \texttt{HEALTHCHECK}.
 
-Table~\ref{tab:health-probes} lists the Kubernetes liveness/readiness probe timing
+We summarise the Kubernetes liveness and readiness probe timing
 from the Helm chart's templates. The four backend services share identical timing;
 \texttt{ecomm-ui} uses longer, more forgiving timing against \texttt{/} rather than a
 dedicated health endpoint, to give its Next.js server-side rendering enough room to
@@ -310,12 +310,12 @@ Backend services (4) & \texttt{GET /health}: 15s delay, every 10s, 5s timeout, 3
 \end{tabularx}
 \end{table}
 
-The readiness probe's shorter delay and interval mean a pod is pulled out of
+Moreover, the readiness probe's shorter delay and interval mean a pod is pulled out of
 rotation quickly if it stops responding, while the liveness probe's longer
 thresholds avoid restarting a container that is merely slow to start.
 
 \section{Deployment Guide}\label{sec:deployment-guide}
-The steps below follow \texttt{Terraform-code/DEPLOYMENT.md} and cover the
+We based the steps below on \texttt{Terraform-\allowbreak code/\allowbreak DEPLOYMENT.md}; they cover the
 one-time setup of a new environment by hand; \texttt{deploy.yml}
 (Section~\ref{sec:bootstrap-pipeline}) automates the same sequence. Once the
 environment exists, ordinary code changes go through the per-push CI/CD path in
@@ -367,8 +367,9 @@ helm install ecommerce ./helm/ecommerce-app -n ecommerce-ns
         pipeline instead of manual commands.
 \end{enumerate}
 
+\newpage
 \section{Configuration Reference}\label{sec:config-reference}
-Table~\ref{tab:config-secrets} lists the environment variables the application
+We summarise the environment variables the application
 reads at runtime.
 
 \begin{table}[H]
@@ -391,19 +392,81 @@ reads at runtime.
 \end{tabularx}
 \end{table}
 
-The four \texttt{*\_SERVICE\_URL} variables and \texttt{MONGODB\_URI} come from a
-ConfigMap (\texttt{app-config}); the rest come from the \texttt{app-secrets} Secret
-described in Section~\ref{sec:bootstrap-pipeline}.
+We source the four \texttt{*\_SERVICE\_URL} variables and \texttt{MONGODB\_URI}
+from a ConfigMap (\texttt{app-config}); however, the remaining values come from
+the \texttt{app-secrets} Secret described in
+Section~\ref{sec:bootstrap-pipeline}.
 
+\newpage
 \section{Testing}\label{sec:testing}
-\begin{infobox}[Testing]
-Automated tests are not currently included in the six repositories.
-\texttt{Terraform-code/.github/workflows/test-runner.yml} contains a placeholder
-runner check but does not execute an application or infrastructure test suite.
+To strengthen quality assurance across our project, we created the dedicated
+\texttt{EjadaStore-Testing} repository. We used it to run automated API,
+security, and regression tests against our production deployment at
+\url{https://shoy.publicvm.com}. During our initial QA cycle, we combined live
+endpoint validation with source-code review and identified 15 opportunities for
+improvement: six critical, five high, and four medium priority.
+
+\subsection*{Critical Remediation Results}
+We use Table~\ref{tab:qa-critical-results} to record the six critical cases and the result
+of the production retest after the fixes were deployed.
+
+\begin{table}[H]
+\centering
+\caption{Critical QA findings verified after remediation.}
+\label{tab:qa-critical-results}
+\footnotesize
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{1.7cm}
+                >{\raggedright\arraybackslash}X
+                >{\raggedright\arraybackslash}p{2.1cm}}
+\toprule
+\textbf{ID} & \textbf{Verified behavior after remediation} & \textbf{Retest status} \\
+\midrule
+\code{BUG-001} & Anonymous product-creation requests are rejected. & Passed \\
+\code{BUG-003} & Orders with zero or negative item quantities are rejected before stock is changed. & Passed \\
+\code{BUG-006} & An unauthenticated caller cannot register a new administrator account. & Passed \\
+\code{BUG-008} & Anonymous order-status updates are rejected. & Passed \\
+\code{BUG-009} & The production database seed and wipe endpoint is protected from unauthenticated use. & Passed \\
+\code{BUG-018} & Fabricated Stripe Checkout Session IDs are rejected. & Passed \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Team Response to the Payment-Service Regression}
+During remediation, we found that overlapping changes in the payments service temporarily
+removed \texttt{server.ts} and its associated schema, which prevented the service
+from running correctly. We identified the regression during coordination
+and retesting. Ali Hamad restored the deleted payment-service files and corrected
+the CORS allowlist, while Abdelrahman Darwish reconciled the server and schema
+changes and pushed the consolidated update. Afterward, we tested the deployed service
+again as part of the full production run. This recovery is recorded as a team
+remediation activity rather than as a separate product defect because it occurred
+while the original findings were being fixed.
+
+\subsection*{Final Production Retest}
+In our follow-up run, we executed 95 checks and passed 93, giving us a rounded
+pass rate of 98\%. We confirmed that all six critical security cases passed and
+that the corrected CORS rules were active in the deployed services. However, two
+data-integrity checks still failed, associated with \code{BUG-010} and
+\code{BUG-011}: legacy
+database records still contained a null category reference and a negative price
+created before the corresponding fixes. These results helped us distinguish application
+remediation from historical data cleanup: we corrected the code path, while old
+records still required migration or reseeding.
+
+\begin{infobox}[Testing Outcome]
+After our fixes and redeployment, 93 of 95 production checks passed. We closed the
+six critical findings through retesting. However, the remaining two failures concerned
+legacy database contents, not a recurrence of the payment-service regression.
 \end{infobox}
 
+\newpage
+However, we currently maintain this QA suite separately from the six implementation repositories.
+\texttt{Terraform-\allowbreak code/\allowbreak .github/\allowbreak workflows/\allowbreak test-runner.yml} still contains only a
+placeholder runner check, so integrating the regression suite into CI is a future
+improvement.
+
 \section{Environment Teardown}\label{sec:environment-teardown}
-\texttt{DEPLOYMENT.md} documents teardown in dependency order, uninstalling the
+For teardown, we follow the dependency order documented in \texttt{DEPLOYMENT.md}, uninstalling the
 application before destroying the infrastructure that hosts it:
 
 \begin{lstlisting}[style=shellstyle, caption={Teardown sequence from DEPLOYMENT.md}]

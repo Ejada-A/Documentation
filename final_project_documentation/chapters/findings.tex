@@ -1,7 +1,11 @@
 \chapter{System Components and Runtime Behavior}\label{chap:results}
 
+In this chapter, we summarise what we observed in the deployed workloads,
+request routing, resource allocation, frontend implementation, and reviewed
+repository state.
+
 \section{Component Reference}\label{sec:primary-finding-one}
-Table~\ref{tab:component-reference} lists the deployed workloads, their OCIR
+We summarise the deployed workloads, their OCIR
 repositories, and their ports.
 
 \begin{table}[H]
@@ -24,12 +28,12 @@ repositories, and their ports.
 \end{tabularx}
 \end{table}
 
-\texttt{values.yaml} currently records image tags 17 (auth), 11 (products), 9
+Moreover, we observed that \texttt{values.yaml} records image tags 17 (auth), 11 (products), 9
 (orders), 8 (payments), and 11 (ecomm-ui), reflecting multiple runs of the GitOps
 pipeline.
 
 \section{Request Routing}\label{sec:primary-finding-two}
-Table~\ref{tab:ingress-routing} shows the path-based routing defined in the ingress
+We use Table~\ref{tab:ingress-routing} to show the path-based routing defined in the ingress
 resource.
 
 \begin{table}[H]
@@ -50,7 +54,7 @@ resource.
 \end{tabular}
 \end{table}
 
-The ingress host is \texttt{shoy.publicvm.com}, with a TLS block referencing a
+We configured the ingress host as \texttt{shoy.publicvm.com}, with a TLS block referencing a
 \texttt{shoy-tls-secret}. That certificate is provisioned automatically: the
 bootstrap workflow installs cert-manager and a \texttt{letsencrypt-prod}
 \texttt{ClusterIssuer} using the HTTP-01 solver through the NGINX ingress class,
@@ -59,7 +63,7 @@ so \texttt{shoy-tls-secret} is issued by Let's Encrypt rather than created by ha
 
 \section{Scaling and Resource Allocation}\label{sec:scaling-resource-allocation}
 \begin{warningbox}[Autoscaling Configuration]
-The Helm chart (\texttt{helm/ecommerce-app/templates/hpa.yaml}), which ArgoCD
+We found that the Helm chart (\texttt{helm/\allowbreak ecommerce-app/\allowbreak templates/\allowbreak hpa.yaml}), which ArgoCD
 reconciles, scales every workload on CPU utilization only, at 75\%. The raw manifest
 (\texttt{kubernetes/06-hpa.yaml}) scales the same workloads on both CPU (75\%) and
 memory (80\%). Table~\ref{tab:hpa-actual} shows the Helm policy, since that is the
@@ -80,8 +84,8 @@ one GitOps keeps live.
 \end{tabularx}
 \end{table}
 
-Table~\ref{tab:resource-sizing} lists per-pod CPU and memory requests and limits;
-the four backend services use identical values.
+Moreover, we summarise the per-pod CPU and memory requests and limits in
+Table~\ref{tab:resource-sizing}; the four backend services use identical values.
 
 \begin{table}[H]
 \centering
@@ -101,8 +105,8 @@ the four backend services use identical values.
 
 \clearpage
 \section{Frontend Implementation Status}\label{sec:frontend-completeness}
-Table~\ref{tab:frontend-status} summarises the current implementation status of
-the storefront and administration pages.
+We summarise the implementation status we observed in the storefront and
+administration pages in Table~\ref{tab:frontend-status}.
 
 \begin{table}[H]
 \centering
@@ -128,18 +132,18 @@ User login/registration & Credentials are validated server-side; no session or t
 \renewcommand{\arraystretch}{1}
 \end{table}
 
-A second cart implementation using Zustand (\texttt{src/hooks/useCart.ts}) also
-exists in the repository; it is imported by one component
-(\texttt{components/modules/products/ProductCard.tsx}) that is not rendered by any
+Moreover, we found a second cart implementation using Zustand
+(\texttt{src/\allowbreak hooks/\allowbreak useCart.ts}); it is imported by one component
+(\texttt{components/\allowbreak modules/\allowbreak products/\allowbreak ProductCard.tsx}) that is not rendered by any
 page currently in use. The cart implementation used by the working pages is
 \texttt{src/context/CartContext.tsx}.
 
-\section{Validation Approach}\label{sec:validation-approach}
+\section{Sources Reviewed}\label{sec:validation-approach}
 \label{sec:quant-comparative-scenario}
-This documentation is based on a review of all six \texttt{Ejada-A} repositories:
-application source, Terraform configuration, Helm charts, Kubernetes manifests, and
-CI/CD workflows. Table~\ref{tab:evidence-commits} records the
-commit each repository was reviewed at.
+We based this documentation on our review of all six \texttt{Ejada-A} repositories:
+application source, Terraform configuration, Helm charts, Kubernetes manifests,
+and CI/CD workflows. In Table~\ref{tab:evidence-commits}, we record the commit at
+which we reviewed each repository.
 
 \begin{table}[H]
 \centering

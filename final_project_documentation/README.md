@@ -31,11 +31,12 @@ The system as it is actually implemented across the six `Ejada-A` repositories
 (four backend microservices, the Next.js frontend, and the Terraform/Kubernetes/Helm/
 ArgoCD infrastructure), read directly from source, not summarized from the team's
 earlier Architecture & Design Draft. Every technical claim traces to a specific file
-at a specific commit (listed in Chapter 5, "Validation Approach"). Where the draft
+at a specific commit (listed in Chapter 5, "Sources Reviewed"). Where the draft
 and the repositories disagree, the documentation says so explicitly and follows the
 repositories (Chapter 2, "Design Draft vs. Implementation"), including gaps such as
-missing request-level authorization, an unverified payment-confirmation flow, and
-unfinished storefront pages (Chapter 6, "Limitations and Future Improvements").
+the request-level authorization and payment-confirmation gaps found by the initial
+QA pass, their later remediation, and unfinished storefront pages (Chapter 6,
+"Limitations and Future Improvements").
 
 ## Repository structure
 
@@ -51,7 +52,7 @@ final_project_documentation/
 │   ├── 02_new_commands.tex      # Custom commands, TikZ styles, heading/pagestyle/callout-box setup
 │   ├── 03_Authors_info.tex      # Title, subtitle, author, team name (edit metadata here)
 │   ├── 04_titlepage.tex         # Title page layout (logos, metadata table, team roster)
-│   ├── 09_abstract.tex          # Executive Summary
+│   ├── 09_abstract.tex          # Technical Summary
 │   └── 10_toc_figures_tables.tex# Table of contents
 │
 ├── chapters/                    # The actual documentation content, one file per chapter
@@ -122,8 +123,8 @@ you forget to clean them.
 | --- | --- |
 | **1. Project Overview** | Objectives and scope, in/out-of-scope boundaries, and project ownership |
 | **2. System Architecture** | Repository-by-repository breakdown, domain ownership (and the shared-database pattern behind it), technology stack by evidence, deployed architecture diagrams, the network design as currently coded, and a Design Draft vs. Implementation reconciliation table |
-| **3. Security Considerations** | Network-level access as actually enabled, the two real authentication mechanisms (and what has none), the unverified payment-confirmation flow, secrets management (including a dead plaintext block in `values.yaml`), IAM, the data layer, and pod hardening |
-| **4. Infrastructure and Deployment** | The Terraform `network`/`oke` module composition, the per-push CI/CD pipeline vs. the separate manual infrastructure-bootstrap workflow, container image/health-check design, a deployment guide, a configuration reference of every environment variable the code actually reads, and a note on the (currently absent) test suite |
+| **3. Security Considerations** | The security baseline at the reviewed commits: network access, authentication, the original payment-confirmation gap, secrets management, IAM, the data layer, and pod hardening, with the newer remediation evidence cross-referenced |
+| **4. Infrastructure and Deployment** | The Terraform `network`/`oke` module composition, CI/CD and bootstrap workflows, container and health-check design, deployment and configuration references, plus the complete QA and team-remediation record culminating in a 93/95 production retest |
 | **5. System Components and Runtime Behavior** | A component reference, path-based routing, a discrepancy between the two committed autoscaling policies, frontend feature completeness (what works vs. what ships as an unfinished scaffold), and the commits this documentation was verified against |
 | **6. Limitations and Future Improvements** | Current limitations grounded in the security/completeness findings above, recommended next steps, monitoring recommendations, and open questions |
 | **7. Troubleshooting** | Common symptoms, diagnostic commands, and likely causes |

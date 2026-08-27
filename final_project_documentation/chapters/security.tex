@@ -1,12 +1,15 @@
 \chapter{Security Considerations}\label{chap:security}
 
-This chapter covers network access, authentication and authorization, payment
-confirmation, secrets management, IAM, the data layer, and pod-level hardening as
-currently configured.
+In this chapter, we record the security baseline we observed at the source commits
+listed in Chapter~\ref{chap:results}. We cover network access, authentication and
+authorization, payment confirmation, secrets management, IAM, the data layer, and
+pod-level hardening. However, this baseline predates our later production
+remediation and retest in Section~\ref{sec:testing}; where the two differ, we use
+the retest as the newer operational evidence.
 
 \section{Network-Level Access}\label{sec:sec-network}
-Table~\ref{tab:security-network} summarises the network paths currently open to the
-cluster, based on \texttt{modules/network/locals.tf} and the boolean overrides in
+We summarise the network paths we found open to the
+cluster, based on \texttt{modules/\allowbreak network/\allowbreak locals.tf} and the boolean overrides in
 \texttt{main.tf} (Section~\ref{sec:domain-context}).
 
 \begin{table}[H]
@@ -29,14 +32,14 @@ ArgoCD server UI & Exposed via a public NGINX ingress (\texttt{argocd/argocd-ing
 \end{tabularx}
 \end{table}
 
-The network module's optional access switches default to off; the root module
-enables all of them. Worker nodes and pods still reach OCI services (including
+We found that the network module's optional access switches default to off;
+however, the root module enables all of them. Worker nodes and pods still reach OCI services (including
 OCIR image pulls) through the private Service Gateway rather than the NAT path,
 matching the route tables in Appendix~\ref{sec:appendix-network}.
 
 \section{Authentication and Authorization}\label{sec:sec-app-auth}
-\begin{warningbox}[Backend Authorization]
-The backend services (\texttt{auth-service}, \texttt{products-service},
+\begin{warningbox}[Backend Authorization at the Initial Review]
+In our initial review, we found that the backend services (\texttt{auth-service}, \texttt{products-service},
 \texttt{orders-service}, \texttt{payments-service}) do not check a token, header, or
 role on any route. \texttt{products-service}'s \texttt{POST}, \texttt{PUT}, and
 \texttt{DELETE /products} routes -- and the \texttt{ecomm-ui} BFF routes and Server
@@ -44,7 +47,7 @@ Actions that call them -- accept requests from any caller that can reach the
 service.
 \end{warningbox}
 
-The system implements two authentication paths:
+We found two authentication paths in the system:
 
 \begin{itemize}[leftmargin=1.4em]
   \item \textbf{Admin authentication.} \texttt{auth-service}'s \texttt{POST
@@ -62,8 +65,8 @@ The system implements two authentication paths:
 \end{itemize}
 
 \section{Payment Confirmation}\label{sec:sec-payments}
-\texttt{payments-service} creates a Stripe Checkout Session and a \texttt{pending}
-\texttt{Order} record. When Stripe redirects the browser back to
+We found that \texttt{payments-service} creates a Stripe Checkout Session and a
+\texttt{pending} \texttt{Order} record. When Stripe redirects the browser back to
 \texttt{/checkout/success}, that page calls \texttt{POST /api/orders/confirm} with
 the \texttt{orderId} and \texttt{sessionId} from the URL. The route does not call
 Stripe to verify the session before updating the order; it sets \texttt{status:
@@ -75,12 +78,13 @@ Stripe to verify the session before updating the order; it sets \texttt{status:
 // For this tutorial, we will trust the redirect.
 \end{lstlisting}
 
-No Stripe webhook handler exists in \texttt{payments-service} or elsewhere in the
-repositories. Order confirmation currently depends on the client reaching the
-success URL, not on a verified payment event.
+Moreover, we found no Stripe webhook handler in \texttt{payments-service} or
+elsewhere in the repositories at the reviewed commits. However, our subsequent remediation added Stripe
+session validation: the production retest rejected a fabricated session ID and
+closed \code{BUG-018} (Section~\ref{sec:testing}).
 
 \section{Secrets Management}\label{sec:sec-secrets}
-Secrets are handled in two different ways across the repository:
+We found two different secrets-management patterns across the repository:
 
 \begin{itemize}[leftmargin=1.4em]
   \item \textbf{Automated deployment (\texttt{deploy.yml}).} \texttt{JWT\_SECRET},
@@ -101,7 +105,7 @@ Secrets are handled in two different ways across the repository:
         remains in the repository's Git history.
 \end{itemize}
 
-OCI Vault integration is referenced in \texttt{DEPLOYMENT.md}, which lists three
+Moreover, we found that OCI Vault integration is referenced in \texttt{DEPLOYMENT.md}, which lists three
 GitHub secret names implying Vault-stored OCIDs
 (\texttt{VAULT\_OCIR\_AUTH\_TOKEN\_OCID}, \texttt{VAULT\_STRIPE\_SECRET\_KEY\_OCID},
 \texttt{VAULT\_JWT\_SECRET\_OCID}). None of these names appear in any Terraform file
@@ -109,7 +113,7 @@ or GitHub Actions workflow, and no Vault resource exists in
 \texttt{Terraform-code}; secrets are managed through Kubernetes Secrets instead.
 
 \section{IAM}\label{sec:sec-iam}
-\texttt{main.tf} contains a commented-out dynamic group and IAM policy for OKE
+In our IAM review, we found that \texttt{main.tf} contains a commented-out dynamic group and IAM policy for OKE
 worker access to images and secrets, with an inline note that the team did not have
 tenancy-level access to create dynamic groups. The current deployment uses a
 static, permanent OCI Auth Token (\texttt{ocir-secret}, a Kubernetes
@@ -119,7 +123,7 @@ took down image pulls cluster-wide with \texttt{ImagePullBackOff} once it did; t
 permanent token avoids that failure mode.
 
 \section{Data Layer}\label{sec:sec-data}
-MongoDB is deployed as a single replica
+We observed that MongoDB is deployed as a single replica
 (\texttt{helm/ecommerce-app/\allowbreak templates/\allowbreak mongodb.yaml}) with no
 authentication configured. Any pod that can reach the \texttt{mongodb} ClusterIP
 Service in the namespace can read or write every collection without credentials, and
@@ -127,7 +131,8 @@ the single-replica deployment is a shared dependency for all five workloads with
 built-in redundancy.
 
 \section{Pod-Level Hardening}\label{sec:sec-pod}
-Every workload's Deployment sets \texttt{securityContext: runAsNonRoot: true} with an
+However, we also confirmed a consistent pod-hardening measure: every workload's
+Deployment sets \texttt{securityContext: runAsNonRoot: true} with an
 explicit non-root UID (1000 for the four backend services, 1001 for
 \texttt{ecomm-ui}), matching each Dockerfile's own \texttt{USER} directive, applied
 consistently across all five workloads.

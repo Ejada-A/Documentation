@@ -35,14 +35,24 @@ Service Gateway & Provides a private path from the private subnets to other OCI 
 
 \clearpage
 \chapter{Network Configuration Reference}\label{sec:appendix-network}
-Every ingress and egress rule attaches at the resource level through a Network
-Security Group rather than a subnet-wide security list. Tables~\ref{tab:nsg-api}
-through~\ref{tab:nsg-lb} list the rules declared in
-\texttt{modules/network/locals.tf} for each of the four subnets
+In this reference, we document how we attached every ingress and egress rule at
+the resource level through a Network Security Group rather than a subnet-wide
+security list. Tables~\ref{tab:nsg-api} through~\ref{tab:nsg-lb} list the rules declared in
+\texttt{modules/\allowbreak network/\allowbreak locals.tf} for each of the four subnets
 (Section~\ref{sec:domain-context}). Rows marked \emph{optional, enabled} come from a
 boolean toggle that defaults to \texttt{false} in the network module but is set to
 \texttt{true} in the root module (\texttt{main.tf}); see
 Section~\ref{sec:sec-network}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{Figures/networkVisualizerOverview.jpeg}
+\caption{OCI Console Network Visualizer view of \texttt{groupa-dev-vcn}, showing the
+Internet Gateway (\texttt{groupa-dev-igw}), NAT Gateway (\texttt{groupa-dev-nat}),
+and Service Gateway (\texttt{groupa-dev-svc-...}) attached to the VCN, and the
+default security list shared by all four subnets.}
+\label{fig:network-visualizer-overview}
+\end{figure}
 
 \begin{table}[H]
 \centering
@@ -103,6 +113,15 @@ Egress & Worker Nodes CIDR & TCP 10250 & API endpoint to worker node communicati
 \end{tabularx}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{Figures/networkVisualizerApiEndpoint.jpeg}
+\caption{Network Visualizer view of the \texttt{groupa-dev-api-endpoint-subnet},
+showing the OKE cluster's Kubernetes API endpoint attached to the
+\texttt{groupa-dev-api-endpoint-nsg}.}
+\label{fig:nsg-api-visualizer}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \caption{NSG rules for the Worker Nodes subnet.}
@@ -129,6 +148,15 @@ Egress & \textbf{0.0.0.0/0} (optional, enabled) & TCP ALL & General outbound int
 \end{tabularx}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{Figures/networkVisualizerWorkerNodes.jpeg}
+\caption{Network Visualizer view of the \texttt{groupa-dev-worker-nodes-subnet},
+showing the two OKE-managed ingress rules attached to the
+\texttt{groupa-dev-worker-nodes-nsg}.}
+\label{fig:nsg-workers-visualizer}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \caption{NSG rules for the Pods subnet.}
@@ -150,6 +178,14 @@ Egress & \textbf{0.0.0.0/0} (optional, enabled) & TCP 443 & Outbound internet ac
 \end{tabularx}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{Figures/networkVisualizerPods.jpeg}
+\caption{Network Visualizer view of the \texttt{groupa-dev-pods-subnet}, showing the
+same OKE-managed ingress rules attached to the \texttt{groupa-dev-pods-nsg}.}
+\label{fig:nsg-pods-visualizer}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \caption{NSG rules for the Load Balancer subnet.}
@@ -167,8 +203,17 @@ Egress & Worker Nodes CIDR & TCP 10256 & LB communicates with kube-proxy health 
 \end{tabularx}
 \end{table}
 
-The rules marked \emph{optional, enabled} come from boolean switches in
-\texttt{modules/network/variables.tf} (SSH access, general worker outbound, pod
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{Figures/networkVisualizerLoadBalancer.jpeg}
+\caption{Network Visualizer view of the \texttt{groupa-dev-load-balancer-subnet},
+showing the public Load Balancer attached to the
+\texttt{groupa-dev-load-balancer-nsg}.}
+\label{fig:nsg-lb-visualizer}
+\end{figure}
+
+We use \emph{optional, enabled} to mark rules that come from boolean switches in
+\texttt{modules/\allowbreak network/\allowbreak variables.tf} (SSH access, general worker outbound, pod
 outbound internet, and public NodePort access) that default to \texttt{false}; the
 root module sets all four to \texttt{true}. See Section~\ref{sec:sec-network} for
 the security implications.
@@ -177,7 +222,7 @@ the security implications.
 \chapter{Command Reference}\label{sec:appendix-command-reference}
 \begin{table}[H]
 \centering
-\caption{Commands used to deploy, operate, and tear down the system, from \texttt{Terraform-code/DEPLOYMENT.md}.}
+\caption{Commands used to deploy, operate, and tear down the system, from \texttt{Terraform-\allowbreak code/\allowbreak DEPLOYMENT.md}.}
 \label{tab:command-reference}
 \small
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{5.4cm} X}
