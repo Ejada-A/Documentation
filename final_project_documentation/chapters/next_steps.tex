@@ -9,20 +9,22 @@ Chapter~\ref{chap:Methodology}.
 \centering
 \caption{Common symptoms, diagnostic commands, and likely causes.}
 \label{tab:troubleshooting}
-\small
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm}
                 >{\raggedright\arraybackslash}p{4.4cm}
                 >{\raggedright\arraybackslash}X}
 \toprule
 \textbf{Symptom} & \textbf{Diagnostic command} & \textbf{Likely cause} \\
 \midrule
-A pod is stuck in \code{CrashLoop\allowbreak BackOff} & \code{kubectl logs <pod> -n ecommerce-ns --previous} & Missing or misconfigured secret (Table~\ref{tab:config-secrets}), or the service cannot reach MongoDB \\
-A pod never becomes \code{Ready} & \code{kubectl describe pod <pod> -n ecommerce-ns} & Failing readiness probe against \code{/health}; check the probe timing in Table~\ref{tab:health-probes} \\
-A new image never rolls out after a push & Check the run status of \code{ci.yml} and \code{update-helm.yml} in the service's repository, then \code{git log -p values.yaml} in \texttt{Terraform-code} & The reusable \texttt{update-helm.yml} workflow failed to bump the tag, or ArgoCD has not yet synced \\
-ArgoCD shows \code{OutOfSync} & \code{argocd app get ecommerce-app} & \texttt{selfHeal} will revert any manual \texttt{kubectl edit}; the fix is always a Git commit to \texttt{Terraform-code}, never a live edit \\
-A request to a backend path returns 502/504 & \code{kubectl get endpoints -n ecommerce-ns} and re-check Table~\ref{tab:ingress-routing} & The target Service has no Ready pods behind it, or the ingress path/port does not match the Service definition \\
-Deployment stuck after \code{terraform apply} & \code{terraform plan} again, then \code{oci ce cluster create-kubeconfig} to refresh local cluster access & Stale local \texttt{kubeconfig}, or a resource still reconciling in OCI \\
+A pod is stuck in \code{CrashLoop\allowbreak BackOff} & \code{kubectl logs <pod> -n ecommerce-ns --previous} & Missing or misconfigured secret (Table~\ref{tab:config-secrets}), or the service cannot reach MongoDB \\[5pt]
+A pod never becomes \code{Ready} & \code{kubectl describe pod <pod> -n ecommerce-ns} & Failing readiness probe against \code{/health}; check the probe timing in Table~\ref{tab:health-probes} \\[5pt]
+A new image never rolls out after a push & Check the run status of \code{ci.yml} and \code{update-helm.yml} in the service's repository, then \code{git log -p values.yaml} in \texttt{Terraform-code} & The reusable \texttt{update-helm.yml} workflow failed to bump the tag, or ArgoCD has not yet synced \\[5pt]
+ArgoCD shows \code{OutOfSync} & \code{argocd app get ecommerce-app} & \texttt{selfHeal} will revert any manual \texttt{kubectl edit}; the fix is always a Git commit to \texttt{Terraform-code}, never a live edit \\[5pt]
+A request to a backend path returns 502/504 & \code{kubectl get endpoints -n ecommerce-ns} and re-check Table~\ref{tab:ingress-routing} & The target Service has no Ready pods behind it, or the ingress path/port does not match the Service definition \\[5pt]
+Pods across the namespace show \code{Image\allowbreak PullBackOff} at the same time & \code{kubectl describe pod <pod> -n ecommerce-ns} and check the \code{ocir-secret} age & The \texttt{OCI\_AUTH\_TOKEN} behind \code{ocir-secret} is a permanent OCI Auth Token; if it was ever regenerated as a short-lived CLI token instead, pulls fail once it expires \\[5pt]
 An order shows \code{paid} that was never actually paid & \code{kubectl logs -n ecommerce-ns -l app=payments-\allowbreak service --tail=50} and check the Stripe dashboard for a matching session & Consistent with Section~\ref{sec:sec-payments}: \code{/api/orders/confirm} does not verify the Stripe session, so any call with a valid \code{orderId} succeeds \\
 \bottomrule
 \end{tabularx}
+\renewcommand{\arraystretch}{1}
 \end{table}

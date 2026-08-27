@@ -111,9 +111,12 @@ or GitHub Actions workflow, and no Vault resource exists in
 \section{IAM}\label{sec:sec-iam}
 \texttt{main.tf} contains a commented-out dynamic group and IAM policy for OKE
 worker access to images and secrets, with an inline note that the team did not have
-tenancy-level access to create dynamic groups. The current deployment uses a static
-OCIR authentication token (\texttt{ocir-secret}, a Kubernetes
-\texttt{docker-registry} Secret) instead.
+tenancy-level access to create dynamic groups. The current deployment uses a
+static, permanent OCI Auth Token (\texttt{ocir-secret}, a Kubernetes
+\texttt{docker-registry} Secret) instead. An earlier version generated this token
+from the OCI CLI's short-lived \texttt{access-token get} command, which expired and
+took down image pulls cluster-wide with \texttt{ImagePullBackOff} once it did; the
+permanent token avoids that failure mode.
 
 \section{Data Layer}\label{sec:sec-data}
 MongoDB is deployed as a single replica

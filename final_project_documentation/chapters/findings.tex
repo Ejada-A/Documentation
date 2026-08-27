@@ -99,6 +99,7 @@ the four backend services use identical values.
 \end{tabularx}
 \end{table}
 
+\clearpage
 \section{Frontend Implementation Status}\label{sec:frontend-completeness}
 Table~\ref{tab:frontend-status} summarises the current implementation status of
 the storefront and administration pages.
@@ -107,7 +108,8 @@ the storefront and administration pages.
 \centering
 \caption{Frontend implementation status.}
 \label{tab:frontend-status}
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.85}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm}
                 >{\raggedright\arraybackslash}X}
 \toprule
@@ -123,6 +125,7 @@ Admin dashboard KPIs (\texttt{/admin}) & Displays static placeholder metrics (e.
 User login/registration & Credentials are validated server-side; no session or token is issued afterward (Section~\ref{sec:sec-app-auth}) \\
 \bottomrule
 \end{tabularx}
+\renewcommand{\arraystretch}{1}
 \end{table}
 
 A second cart implementation using Zustand (\texttt{src/hooks/useCart.ts}) also
@@ -135,9 +138,7 @@ page currently in use. The cart implementation used by the working pages is
 \label{sec:quant-comparative-scenario}
 This documentation is based on a review of all six \texttt{Ejada-A} repositories:
 application source, Terraform configuration, Helm charts, Kubernetes manifests, and
-CI/CD workflows. Claims were cross-referenced across repositories -- for example,
-checking that an environment variable a service reads matches what the
-ConfigMap or Secret actually provides. Table~\ref{tab:evidence-commits} records the
+CI/CD workflows. Table~\ref{tab:evidence-commits} records the
 commit each repository was reviewed at.
 
 \begin{table}[H]

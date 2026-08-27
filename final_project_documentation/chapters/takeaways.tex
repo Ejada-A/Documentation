@@ -57,15 +57,3 @@ Requests to \texttt{/api/orders/confirm} & This route does not verify the underl
 \bottomrule
 \end{tabularx}
 \end{table}
-
-\section{Open Questions}\label{sec:open-questions}
-\begin{itemize}[leftmargin=1.4em]
-  \item whether the raw \texttt{kubernetes/} manifests should be retired now that
-        ArgoCD manages the Helm chart, given the two already define different
-        autoscaling policies;
-  \item whether the shared MongoDB instance should be split per service before this
-        architecture is reused beyond the internship context; and
-  \item whether the OKE IAM dynamic group policy, currently commented out in
-        \texttt{main.tf} for lack of tenancy access, should be revisited once
-        broader access is available.
-\end{itemize}

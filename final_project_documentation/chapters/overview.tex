@@ -23,20 +23,33 @@ and a few areas of the implementation differ from the original design draft,
 summarised in Section~\ref{sec:draft-vs-implementation}.
 
 \section{Project Ownership}\label{sec:key-stakeholders}
+Table~\ref{tab:stakeholder-map} lists each team member's area of responsibility
+for this build.
+
 \begin{table}[H]
 \centering
-\caption{Project ownership and audience.}
+\caption{Team members and areas of responsibility.}
 \label{tab:stakeholder-map}
-\small
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.6cm}
+\footnotesize
+\renewcommand{\arraystretch}{0.85}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.6cm}
                 >{\raggedright\arraybackslash}X}
 \toprule
-\textbf{Owner} & \textbf{Area} \\
+\textbf{Member} & \textbf{Area} \\
 \midrule
-Group A (build team) & All six repositories: four backend microservices, the frontend, and the Terraform/Helm/ArgoCD deployment pipeline \\
-Ali Yousef & Documentation coordination for this deliverable \\
-Ali Hamad & Helm chart maintainer; author of the deployment runbook (\texttt{DEPLOYMENT.md}) referenced throughout \\
-Ejada Cloud Build Track & Reviews this deliverable against the program's learning objectives \\
+Ali Ahmed Fakhry Hamad & Deployment \\
+Abdelrahman Darwish & E-commerce application \\
+Salma Azara & Terraform code \\
+Ali Tallawy & Testing \\
+Beshoy Sorial & CI/CD \\
+Mohamed Kholosy & E-commerce application \\
+Habiba Fawzy & Database \\
+Chris Mina Kamal & Terraform code \\
+Basel Alaa & Terraform code \\
+Yara Adel & Architecture and design \\
+Ali Youssef & Documentation \\
+Peter Kameel & Testing \\
 \bottomrule
 \end{tabularx}
+\renewcommand{\arraystretch}{1}
 \end{table}

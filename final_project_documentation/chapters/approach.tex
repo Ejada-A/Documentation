@@ -201,18 +201,23 @@ every push and does not provision infrastructure, which is handled separately
 \section{Infrastructure Bootstrap Pipeline}\label{sec:bootstrap-pipeline}
 \texttt{Terraform-code/.github/workflows/deploy.yml} provisions the environment from
 a clean account. Triggered manually (\texttt{workflow\_dispatch}) rather than on
-push, it runs, in order: \texttt{terraform apply}; installs the NGINX Ingress
-Controller via Helm; installs cert-manager and a \texttt{letsencrypt-prod}
-\texttt{ClusterIssuer} (HTTP-01, using the \texttt{ADMIN\_EMAIL} secret as the
-ACME registration email) so the ingress's TLS certificate is issued
-automatically; generates a kubeconfig from the new cluster's OCID; creates the
-\texttt{ocir-secret} and \texttt{app-secrets} Kubernetes Secrets from encrypted
-GitHub Actions secrets; installs ArgoCD from its upstream manifest; and applies
-\texttt{argocd/ecommerce-app.yaml} and \texttt{argocd/argocd-ingress.yaml}. This
-one workflow assembles the full stack: infrastructure, ingress controller and
-TLS, secrets, and the GitOps controller. Because Terraform state lives in the
-S3-compatible OCI backend rather than on the runner, re-running the workflow
-updates the existing infrastructure instead of provisioning a duplicate VCN or
+push, it runs, in order: \texttt{terraform apply}; extracts the new cluster's OCID
+and load balancer subnet OCID from the Terraform output; generates a kubeconfig
+from that cluster OCID; installs the NGINX Ingress Controller via Helm, passing
+the load balancer subnet OCID through the
+\texttt{service.beta.kubernetes.io/oci-load-balancer-subnet1} annotation so OCI
+knows where to attach the Load Balancer; installs cert-manager and a
+\texttt{letsencrypt-prod} \texttt{ClusterIssuer} (HTTP-01, using the
+\texttt{ADMIN\_EMAIL} secret as the ACME registration email) so the ingress's TLS
+certificate is issued automatically; creates the \texttt{ocir-secret} and
+\texttt{app-secrets} Kubernetes Secrets from encrypted GitHub Actions secrets;
+installs ArgoCD from its upstream manifest; and applies
+\texttt{argocd/ecommerce-app.yaml} and \texttt{argocd/argocd-ingress.yaml}. The
+kubeconfig step runs before any \texttt{helm}/\texttt{kubectl} command that
+depends on it. This one workflow assembles the full stack: infrastructure,
+ingress controller and TLS, secrets, and the GitOps controller. Because Terraform
+state lives in the S3-compatible OCI backend rather than on the runner, re-running
+the workflow updates the existing infrastructure instead of provisioning a duplicate VCN or
 cluster.
 
 \begin{figure}[H]

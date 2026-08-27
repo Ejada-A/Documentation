@@ -110,74 +110,7 @@ Pods subnet.
 
 \begin{figure}[H]
 \centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[font=\sffamily\footnotesize]
-
-\node[neutralbox, minimum width=4.8cm, minimum height=1.7cm, text width=4.1cm] (internetN) at (0,16.6)
-  {\textbf{Internet}\\[2pt]{\scriptsize shoppers / \texttt{kubectl}}};
-\node[neutralbox, minimum width=4.8cm, minimum height=1.7cm, text width=4.1cm] (devN) at (0,13.4)
-  {\textbf{Developer}\\[2pt]{\scriptsize\texttt{kubectl} / browser}};
-\draw[arrow] (devN.north) -- (internetN.south);
-
-\draw[ThesisGrey, dashed, line width=0.6pt, rounded corners=3pt] (-18.2,-3.6) rectangle (18.2,12.3);
-\node[title, anchor=north west] at (-17.8,11.9) {VCN: \texttt{groupa-dev-vcn} (\texttt{10.0.0.0/16})};
-
-\draw[ThesisBlue, line width=0.55pt, rounded corners=1pt, fill=white] (-17.6,5.7) rectangle (-1.0,10.1);
-\draw[ThesisBlue, line width=0.55pt, rounded corners=1pt, fill=white] (1.0,5.7) rectangle (17.6,10.1);
-\draw[ThesisBlue, line width=0.55pt, rounded corners=1pt, fill=white] (-17.6,-2.9) rectangle (-1.0,3.9);
-\draw[ThesisBlue, line width=0.55pt, rounded corners=1pt, fill=white] (1.0,-2.9) rectangle (17.6,3.9);
-
-\node[title, anchor=north west, text width=8.5cm] at (-17.2,9.75) {API Endpoint Subnet (Public)\\[1pt]{\scriptsize\ttfamily 10.0.0.0/28}};
-\node[title, anchor=north west, text width=8.5cm] at (1.4,9.75) {Load Balancer Subnet (Public)\\[1pt]{\scriptsize\ttfamily 10.0.0.16/28}};
-\node[title, anchor=north west, text width=8.5cm] at (-17.2,3.55) {Worker Nodes Subnet (Private)\\[1pt]{\scriptsize\ttfamily 10.0.16.0/20}};
-\node[title, anchor=north west, text width=8.5cm] at (1.4,3.55) {Pods Subnet (Private)\\[1pt]{\scriptsize\ttfamily 10.0.32.0/19}};
-
-\node[evalbox, minimum width=4.0cm, minimum height=1.6cm, text width=3.5cm] (igwN) at (-13.7,7.6) {Internet Gateway};
-\node[evalbox, minimum width=4.2cm, minimum height=1.6cm, text width=3.7cm] (okeN) at (-4.5,7.6) {OKE API Endpoint};
-\draw[arrow] (igwN.east) -- (okeN.west);
-
-\node[evalbox, minimum width=4.6cm, minimum height=1.6cm, text width=4.1cm] (lbN) at (9.3,7.6) {Load Balancer};
-
-\node[evalbox, minimum width=3.7cm, minimum height=1.5cm, text width=3.2cm] (wn1) at (-13.7,0.5) {Worker Node};
-\node[evalbox, minimum width=3.7cm, minimum height=1.5cm, text width=3.2cm] (wn2) at (-9.3,0.5) {Worker Node};
-\node[evalbox, minimum width=3.7cm, minimum height=1.5cm, text width=3.2cm] (natN) at (-4.9,0.5) {NAT Gateway};
-\draw[flowline] (wn1.east) -- (wn2.west);
-\draw[arrow] (wn2.east) -- (natN.west);
-
-\node[evalbox, minimum width=4.0cm, minimum height=1.7cm, text width=3.5cm] (podsN) at (4.9,0.5) {\textbf{Pods}\\[2pt]{\scriptsize 5 services}};
-\node[evalbox, minimum width=4.2cm, minimum height=1.7cm, text width=3.7cm] (svcgwN) at (9.3,0.5) {Service Gateway};
-\node[outputbox, minimum width=4.0cm, minimum height=1.7cm, text width=3.5cm] (mongoN) at (13.7,0.5) {\textbf{MongoDB}\\[2pt]{\scriptsize PVC}};
-\draw[arrow] (podsN.east) -- (svcgwN.west);
-\draw[arrow] (podsN.north) -- (4.9,2.5) -- (13.7,2.5) -- (mongoN.north);
-\node[note] at (9.3,2.8) {\scriptsize mount};
-
-\node[neutralbox, minimum width=4.4cm, minimum height=1.7cm, text width=3.9cm] (ocirN) at (13.7,-6.9) {OCIR Registry};
-
-\draw[arrow] (internetN.south) -| (igwN.north);
-\node[note, text width=3.2cm] at (-10,13.0) {\scriptsize HTTPS/6443};
-
-\draw[arrow] (internetN.south) -| (lbN.north);
-\node[note, text width=3.2cm] at (6.5,13.0) {\scriptsize HTTPS/443};
-
-\draw[arrow, dashed] (okeN.south) -- (-4.5,3.9);
-\node[note, text width=3.4cm] at (-2.1,4.85) {\scriptsize TCP 6443 /\\12250};
-
-\draw[arrow] (lbN.south) -- (9.3,2.9) -- (-9.3,2.9);
-\node[note] at (0,3.2) {\scriptsize routes to};
-
-\node[note] at (-7.1,1.55) {\scriptsize outbound};
-
-\draw[bluearrow] (-1.0,0.5) -- (1.0,0.5);
-\node[note] at (0,1.2) {\scriptsize hosts pods};
-
-\draw[arrow] (natN.south) -- (-4.9,-2.3) -- (9.3,-2.3) -- (svcgwN.south);
-\node[note] at (2.2,-2.65) {\scriptsize OCI services};
-
-\draw[bluearrow, dashed] (svcgwN.south) -- (9.3,-5.0) -- (ocirN.north);
-\node[note] at (11.5,-5.3) {\scriptsize pull image};
-
-\end{tikzpicture}
-}
+\includegraphics[width=\textwidth]{Figures/w4arch.png}
 \caption{Deployed architecture inside VCN \texttt{groupa-dev-vcn} (\texttt{10.0.0.0/16}).}
 \label{fig:topology}
 \end{figure}
@@ -313,6 +246,7 @@ User authentication & Partially implemented & Credentials are validated server-s
 Payment confirmation & Partially implemented & A Stripe Checkout session is created server-side; order status is confirmed through a client call rather than a webhook or session check (Chapter~\ref{chap:security}) \\
 Full storefront browsing & Partially implemented & The homepage and admin panels are functional; the product listing, product detail, and category pages remain incomplete (Section~\ref{sec:frontend-completeness}) \\
 Two parallel deployment manifests & Repository-only & A raw-manifest path and a Helm-chart path both exist and currently define different HPA policies; the draft describes neither (Section~\ref{sec:scaling-resource-allocation}) \\
+TLS certificate source & Implemented differently & An AWS ACM certificate was tried first for the ingress; ACM certificates are locked to AWS infrastructure and cannot export a private key, so the team moved to cert-manager with a Let's Encrypt \texttt{ClusterIssuer} instead (Section~\ref{sec:bootstrap-pipeline}) \\
 Automated testing & Repository-only & Automated tests are not included in any of the six repositories \\
 \bottomrule
 \end{tabularx}
