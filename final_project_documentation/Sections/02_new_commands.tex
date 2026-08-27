@@ -2,8 +2,16 @@
 %Define new commands related to the file:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \setlength{\parindent}{0pt} %no first-line paragraph indentation; parskip spaces paragraphs instead
-\renewcommand{\baselinestretch}{1.1} %determine spacing between lines
+\renewcommand{\baselinestretch}{1.05} %determine spacing between lines
 \raggedbottom
+
+% Keep single lines from being stranded at the top or bottom of a page. Safe
+% to force hard here because the document is \raggedbottom -- there is no
+% column-height stretching to be thrown off by the extra page-breaking
+% constraint.
+\widowpenalty=10000
+\clubpenalty=10000
+\brokenpenalty=10000
 
 % Give the line-breaker much more room before it accepts an overfull line.
 % This document mixes justified prose with many inline \texttt/\code spans

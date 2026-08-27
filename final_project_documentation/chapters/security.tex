@@ -78,8 +78,8 @@ Stripe to verify the session before updating the order; it sets \texttt{status:
 // For this tutorial, we will trust the redirect.
 \end{lstlisting}
 
-Moreover, we found no Stripe webhook handler in \texttt{payments-service} or
-elsewhere in the repositories at the reviewed commits. However, our subsequent remediation added Stripe
+We also found no Stripe webhook handler in \texttt{payments-service} or
+elsewhere in the repositories at the reviewed commits. Our subsequent remediation added Stripe
 session validation: the production retest rejected a fabricated session ID and
 closed \code{BUG-018} (Section~\ref{sec:testing}).
 

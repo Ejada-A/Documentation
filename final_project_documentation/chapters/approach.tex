@@ -445,7 +445,7 @@ while the original findings were being fixed.
 \subsection*{Final Production Retest}
 In our follow-up run, we executed 95 checks and passed 93, giving us a rounded
 pass rate of 98\%. We confirmed that all six critical security cases passed and
-that the corrected CORS rules were active in the deployed services. However, two
+that the corrected CORS rules were active in the deployed services. Two
 data-integrity checks still failed, associated with \code{BUG-010} and
 \code{BUG-011}: legacy
 database records still contained a null category reference and a negative price
@@ -455,12 +455,12 @@ records still required migration or reseeding.
 
 \begin{infobox}[Testing Outcome]
 After our fixes and redeployment, 93 of 95 production checks passed. We closed the
-six critical findings through retesting. However, the remaining two failures concerned
+six critical findings through retesting; the remaining two failures concerned
 legacy database contents, not a recurrence of the payment-service regression.
 \end{infobox}
 
 \newpage
-However, we currently maintain this QA suite separately from the six implementation repositories.
+We currently maintain this QA suite separately from the six implementation repositories.
 \texttt{Terraform-\allowbreak code/\allowbreak .github/\allowbreak workflows/\allowbreak test-runner.yml} still contains only a
 placeholder runner check, so integrating the regression suite into CI is a future
 improvement.

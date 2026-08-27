@@ -1,0 +1,42 @@
+name: Build documentation
+
+on:
+  push:
+    paths:
+      - "final_project_documentation/**"
+      - ".github/workflows/build-docs.yml"
+  pull_request:
+    paths:
+      - "final_project_documentation/**"
+      - ".github/workflows/build-docs.yml"
+  workflow_dispatch:
+
+jobs:
+  latex:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: final_project_documentation
+          root_file: main.tex
+          latexmk_use_xelatex: false
+          args: -pdf -interaction=nonstopmode -halt-on-error -file-line-error
+
+      - name: Check for undefined references
+        working-directory: final_project_documentation
+        run: |
+          if grep -qE "undefined|multiply defined|There were undefined references" team-a-project-documentation.log; then
+            echo "::error::LaTeX log reports undefined or duplicate references"
+            grep -nE "undefined|multiply defined" team-a-project-documentation.log || true
+            exit 1
+          fi
+
+      - name: Upload compiled PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: team-a-project-documentation
+          path: final_project_documentation/team-a-project-documentation.pdf
+          if-no-files-found: error
