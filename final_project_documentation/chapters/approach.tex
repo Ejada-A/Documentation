@@ -406,6 +406,25 @@ security, and regression tests against our production deployment at
 endpoint validation with source-code review and identified 15 opportunities for
 improvement: six critical, five high, and four medium priority.
 
+\subsection*{Testing Architecture \& Framework}
+Our testing architecture employs industry-standard tooling structured across multiple layers:
+\begin{itemize}
+    \item \textbf{API \& Integration Testing:} Built with \textbf{Vitest} for high-speed concurrent execution, covering REST endpoints, request validation, and database state checks. The suite validates all four backend services (Auth, Products, Orders, Payments) as well as health checks.
+    \item \textbf{End-to-End (E2E) UI Testing:} Implemented with \textbf{Playwright} to simulate real customer and admin browser interactions across the Next.js frontend, comprising 12 customer journeys and 8 admin journeys.
+    \item \textbf{Continuous Integration (CI/CD):} Integrated via \textbf{GitHub Actions} (\texttt{qa-tests.yml}) to run automatically on code pushes, pull requests, and a daily schedule.
+    \item \textbf{Security Testing Suite:} Dedicated test cases explicitly targeting NoSQL injection (e.g., email/password object injection), authentication bypass, and data integrity manipulation.
+\end{itemize}
+In total, the test framework comprises over 90 test cases distributed across 6 distinct test files, and can execute full API regression against the live production server in approximately 25-30 seconds.
+
+\subsection*{Testing Recommendations \& Next Steps}
+Based on the QA execution against the production environment, we established the following ongoing recommendations for the development team:
+\begin{enumerate}
+    \item \textbf{Prioritize Auth Middleware Fixes:} Ensure the Next.js BFF (\texttt{middleware.ts}) protects all \texttt{/api/admin/*} routes and mutative endpoints (\texttt{POST}, \texttt{PUT}, \texttt{DELETE}), rather than just the \texttt{/admin} UI pages.
+    \item \textbf{Implement Server-Side Validations:} Enforce strict input validation at the service level (e.g., ensuring \texttt{quantity > 0}, \texttt{price >= 0}) to provide defense-in-depth regardless of frontend constraints.
+    \item \textbf{Adopt Test-Driven Fixes:} Leverage the functional QA suite to verify code changes prior to deployment.
+    \item \textbf{Secure Secrets:} Migrate plaintext Stripe and JWT secrets out of \texttt{docker-compose.yml} and into a secure secrets manager.
+\end{enumerate}
+
 \subsection*{Critical Remediation Results}
 We use Table~\ref{tab:qa-critical-results} to record the six critical cases and the result
 of the production retest after the fixes were deployed.

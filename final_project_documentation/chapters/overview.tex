@@ -26,6 +26,13 @@ pages remain incomplete (Section~\ref{sec:frontend-completeness}) and that a few
 areas of our implementation differ from the original design draft, as we
 summarise in Section~\ref{sec:draft-vs-implementation}.
 
+\section{The Journey from Monolith to Microservices}\label{sec:monolith-journey}
+The project began as a single monolithic repository (\textit{as-is}) containing both the Next.js frontend and a unified Express.js backend. This architecture presented significant scaling and deployment bottlenecks. Because the entire system was tightly coupled, a single code change—whether a minor UI tweak or a critical payment logic fix—necessitated rebuilding and redeploying the entire application stack. This lack of isolation also meant that a failure in one domain (e.g., product catalog search) could potentially crash the entire backend, degrading the user experience across all functionalities.
+
+To achieve greater fault tolerance, team autonomy, and independent scalability, our team embarked on a comprehensive refactoring journey to transition the application into a microservices architecture. We decoupled the monolith based on bounded business domains into four distinct backend services: \texttt{auth-service}, \texttt{products-service}, \texttt{orders-service}, and \texttt{payments-service}, alongside the standalone \texttt{ecomm-ui} Next.js frontend (acting as a Backend-For-Frontend). 
+
+Each microservice was granted its own dedicated Git repository, independent Dockerfile, and distinct CI/CD workflow, culminating in our current multiple-repo configuration. This separation of concerns allows individual teams to develop, test, and ship features independently. For instance, the orders service can scale independently of the auth service during high-traffic checkout events. Furthermore, we containerized these services and deployed them to Oracle Kubernetes Engine (OKE) using a Terraform $\rightarrow$ Docker $\rightarrow$ Helm $\rightarrow$ ArgoCD pipeline, enabling automated GitOps-driven deployments. While the services are now independently deployable, they currently share a single MongoDB instance, representing a pragmatic intermediate step toward full data-tier isolation.
+
 \section{Project Ownership}\label{sec:key-stakeholders}
 We summarise each team member's area of responsibility in
 Table~\ref{tab:stakeholder-map}.
